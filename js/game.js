@@ -1,5 +1,6 @@
 /* ひみつきちつくろ — 描画と入力。数値は config.js、ルールは sim.js。
-   絵の差し替え: drawGround / drawTree / drawFlower / drawNode / drawPlayer / drawHelper / drawBuildingArt
+   絵は assets/{キー}.png。ファイルが無いキーは、下の図形のまま。
+   一覧は js/sprites.js。おえかきは draw/。
 */
 (function (root) {
   "use strict";
@@ -242,6 +243,28 @@
     onPicked(node, result);
   }
 
+  function placeArt(scene, key, displayW, displayH) {
+    if (!key || !scene.textures.exists(key)) return null;
+    const spec = root.SPRITE_BY_KEY[key];
+    const image = scene.add.image(0, 0, key);
+    const w = displayW || (spec && spec.displayW) || image.width;
+    const h = displayH || (spec && spec.displayH) || image.height;
+    image.setDisplaySize(w, h);
+    image.setOrigin(0.5, spec && spec.anchorY != null ? spec.anchorY : 0.5);
+    return image;
+  }
+
+  function artKeyForNode(type) {
+    if (type === "twig" || type === "pebble" || type === "berry" || type === "mushroom") return type;
+    return "";
+  }
+
+  function flowerKey(color) {
+    if (color === 0xf3a3b5) return "flower-pink";
+    if (color === 0xfffaf3) return "flower-white";
+    return "flower";
+  }
+
   function drawGround(scene) {
     const world = cfg().world;
     const g = scene.add.graphics().setDepth(0);
@@ -261,16 +284,15 @@
     g.strokeRect(6, 6, world.width - 12, world.height - 12);
     for (let i = 0; i < 10; i += 1) {
       const angle = (Math.PI * 2 * i) / 10;
-      scene.add
-        .ellipse(
-          world.baseX + Math.cos(angle) * world.baseRadius,
-          world.baseY + Math.sin(angle) * world.baseRadius,
-          16,
-          11,
-          0x9aa098
-        )
-        .setStrokeStyle(2, 0x3c2f26)
-        .setDepth(20);
+      const x = world.baseX + Math.cos(angle) * world.baseRadius;
+      const y = world.baseY + Math.sin(angle) * world.baseRadius;
+      const stone = placeArt(scene, "stone");
+      if (stone) {
+        stone.setPosition(x, y);
+        stone.setDepth(20);
+      } else {
+        scene.add.ellipse(x, y, 16, 11, 0x9aa098).setStrokeStyle(2, 0x3c2f26).setDepth(20);
+      }
     }
     scene.add.text(world.baseX, world.baseY + 78, "ひみつきち", fontStyle(18)).setOrigin(0.5).setDepth(30);
     scene.add.text(world.groveX, world.groveY + 108, "ひかりのはやし", fontStyle(18)).setOrigin(0.5).setDepth(30);
@@ -280,20 +302,46 @@
 
   function drawTree(scene, tree) {
     const c = scene.add.container(tree.x, tree.y);
-    const h = 34 * tree.scale;
-    c.add(scene.add.rectangle(0, 8, 8, 18, 0x6b4630));
-    c.add(scene.add.circle(0, -h * 0.25, 16 * tree.scale, tree.shade > 0.5 ? 0x3f7d4e : 0x4e8d55));
-    c.add(scene.add.circle(-8 * tree.scale, -h * 0.05, 11 * tree.scale, 0x356b43));
+    const key = tree.shade > 0.5 ? "tree-dark" : "tree";
+    const spec = root.SPRITE_BY_KEY[key];
+    const art = spec ? placeArt(scene, key, spec.displayW * tree.scale, spec.displayH * tree.scale) : null;
+    if (art) {
+      art.setPosition(0, 4);
+      c.add(art);
+    } else {
+      const h = 34 * tree.scale;
+      c.add(scene.add.rectangle(0, 8, 8, 18, 0x6b4630));
+      c.add(scene.add.circle(0, -h * 0.25, 16 * tree.scale, tree.shade > 0.5 ? 0x3f7d4e : 0x4e8d55));
+      c.add(scene.add.circle(-8 * tree.scale, -h * 0.05, 11 * tree.scale, 0x356b43));
+    }
     c.setDepth(100 + tree.y);
   }
 
   function drawFlower(scene, flower) {
+    const art = placeArt(scene, flowerKey(flower.color));
+    if (art) {
+      art.setPosition(flower.x, flower.y);
+      art.setDepth(12);
+      return;
+    }
     scene.add.circle(flower.x, flower.y, 3.5, flower.color).setDepth(12);
   }
 
   function drawNode(scene, node) {
     const resource = cfg().resources[node.type];
     const c = scene.add.container(node.x, node.y);
+    const art = placeArt(scene, artKeyForNode(node.type));
+    if (art) {
+      c.add(art);
+      if (node.type === "mushroom") {
+        const glow = scene.add.circle(0, -6, 22, 0xc9b6ff, 0.35);
+        c.addAt(glow, 0);
+        c.add(scene.add.text(0, -30, "とくべつ", fontStyle(13)).setOrigin(0.5));
+        scene.tweens.add({ targets: glow, alpha: 0.1, yoyo: true, repeat: -1, duration: 700 });
+      }
+      c.setDepth(100 + node.y);
+      return c;
+    }
     if (node.type === "twig") {
       c.add(scene.add.rectangle(0, 0, 28, 8, resource.color).setRotation(-0.7).setStrokeStyle(2, 0x3c2f26));
     } else if (node.type === "pebble") {
@@ -317,6 +365,14 @@
   }
 
   function drawBuildingArt(scene, id, parent) {
+    if (id === "box" || id === "workbench" || id === "desk") {
+      const art = placeArt(scene, id);
+      if (art) {
+        art.setPosition(0, 12);
+        parent.add(art);
+        return;
+      }
+    }
     if (id === "box") {
       parent.add(scene.add.rectangle(0, 4, 34, 22, 0x8a5a32).setStrokeStyle(3, 0x3c2f26));
       parent.add(scene.add.rectangle(0, -8, 38, 8, 0xa56b3c).setStrokeStyle(3, 0x3c2f26));
@@ -334,7 +390,14 @@
     cfg().buildingOrder.forEach(function (id) {
       const pos = cfg().slots[id];
       const rootC = scene.add.container(pos.x, pos.y);
-      const marker = scene.add.rectangle(0, 4, 36, 24, 0xe7d7bc, 0.95).setStrokeStyle(2, 0x8a7560);
+      const markerArt = placeArt(scene, "marker");
+      let marker;
+      if (markerArt) {
+        markerArt.setPosition(0, 8);
+        marker = markerArt;
+      } else {
+        marker = scene.add.rectangle(0, 4, 36, 24, 0xe7d7bc, 0.95).setStrokeStyle(2, 0x8a7560);
+      }
       const built = scene.add.container(0, 0);
       drawBuildingArt(scene, id, built);
       built.setVisible(false);
@@ -345,23 +408,41 @@
     });
     const shop = cfg().slots.shop;
     const sign = scene.add.container(shop.x, shop.y);
-    sign.add(scene.add.rectangle(0, 12, 6, 28, 0x8a5a32));
-    sign.add(scene.add.rectangle(0, -6, 58, 28, 0xfff8ee).setStrokeStyle(3, 0x3c2f26));
-    sign.add(scene.add.text(0, -6, "おみせ", fontStyle(14)).setOrigin(0.5));
+    const shopArt = placeArt(scene, "shop");
+    if (shopArt) {
+      shopArt.setPosition(0, 10);
+      sign.add(shopArt);
+    } else {
+      sign.add(scene.add.rectangle(0, 12, 6, 28, 0x8a5a32));
+      sign.add(scene.add.rectangle(0, -6, 58, 28, 0xfff8ee).setStrokeStyle(3, 0x3c2f26));
+      sign.add(scene.add.text(0, -6, "おみせ", fontStyle(14)).setOrigin(0.5));
+    }
     sign.setDepth(100 + shop.y);
   }
 
   function drawPlayer(scene, x, y) {
     const c = scene.add.container(x, y);
     c.add(scene.add.ellipse(0, 20, 34, 12, 0x000000, 0.18));
-    runtime.pack = scene.add.rectangle(-14, 6, 12, 16, 0x8a5a32).setStrokeStyle(2, 0x3c2f26);
+    const body = placeArt(scene, "player");
+    if (body) {
+      body.setPosition(0, 18);
+      c.add(body);
+    } else {
+      c.add(scene.add.ellipse(0, 8, 26, 30, 0x3f7d4e).setStrokeStyle(2, 0x3c2f26));
+      c.add(scene.add.circle(0, -14, 13, 0xf3c7a5).setStrokeStyle(2, 0x3c2f26));
+      c.add(scene.add.ellipse(0, -22, 22, 12, 0x5c3b2e));
+      c.add(scene.add.circle(-4, -14, 1.6, 0x2c241c));
+      c.add(scene.add.circle(4, -14, 1.6, 0x2c241c));
+    }
+    const packArt = placeArt(scene, "backpack");
+    if (packArt) {
+      packArt.setPosition(-20, 6);
+      runtime.pack = packArt;
+    } else {
+      runtime.pack = scene.add.rectangle(-14, 6, 12, 16, 0x8a5a32).setStrokeStyle(2, 0x3c2f26);
+    }
     runtime.pack.setVisible(runtime.state.backpack);
     c.add(runtime.pack);
-    c.add(scene.add.ellipse(0, 8, 26, 30, 0x3f7d4e).setStrokeStyle(2, 0x3c2f26));
-    c.add(scene.add.circle(0, -14, 13, 0xf3c7a5).setStrokeStyle(2, 0x3c2f26));
-    c.add(scene.add.ellipse(0, -22, 22, 12, 0x5c3b2e));
-    c.add(scene.add.circle(-4, -14, 1.6, 0x2c241c));
-    c.add(scene.add.circle(4, -14, 1.6, 0x2c241c));
     const ring = scene.add.graphics();
     ring.lineStyle(2, 0xfffaf3, 0.28);
     ring.strokeCircle(0, 0, cfg().autoCollectRadius);
@@ -374,11 +455,17 @@
     const path = cfg().helperPath;
     const c = scene.add.container(path.x1, path.y1);
     c.add(scene.add.ellipse(0, 18, 26, 10, 0x000000, 0.18));
-    c.add(scene.add.ellipse(0, 6, 22, 26, 0x8a5a32).setStrokeStyle(2, 0x3c2f26));
-    c.add(scene.add.circle(0, -12, 10, 0xf3c7a5).setStrokeStyle(2, 0x3c2f26));
-    c.add(scene.add.ellipse(0, -18, 22, 8, 0xe2b14a).setStrokeStyle(2, 0x3c2f26));
-    c.add(scene.add.circle(-3.5, -12, 1.3, 0x2c241c));
-    c.add(scene.add.circle(3.5, -12, 1.3, 0x2c241c));
+    const art = placeArt(scene, "helper");
+    if (art) {
+      art.setPosition(0, 16);
+      c.add(art);
+    } else {
+      c.add(scene.add.ellipse(0, 6, 22, 26, 0x8a5a32).setStrokeStyle(2, 0x3c2f26));
+      c.add(scene.add.circle(0, -12, 10, 0xf3c7a5).setStrokeStyle(2, 0x3c2f26));
+      c.add(scene.add.ellipse(0, -18, 22, 8, 0xe2b14a).setStrokeStyle(2, 0x3c2f26));
+      c.add(scene.add.circle(-3.5, -12, 1.3, 0x2c241c));
+      c.add(scene.add.circle(3.5, -12, 1.3, 0x2c241c));
+    }
     runtime.helperBubble = scene.add.text(0, -36, "", fontStyle(13)).setOrigin(0.5);
     c.add(runtime.helperBubble);
     c.setVisible(runtime.state.helperHired);
@@ -406,6 +493,13 @@
     const scrollX = Math.max(0, Math.min(maxX, player.x - viewW / 2));
     const scrollY = Math.max(0, Math.min(maxY, player.y - viewH / 2 - cfg().camera.lookAhead));
     cam.setScroll(scrollX, scrollY);
+  }
+
+  function scenePreload(scene) {
+    const sprites = root.SPRITE_LIST || [];
+    sprites.forEach(function (sprite) {
+      scene.load.image(sprite.key, "assets/" + sprite.file);
+    });
   }
 
   function sceneCreate(scene) {
@@ -603,6 +697,9 @@
       },
       input: { activePointers: 2 },
       scene: {
+        preload: function () {
+          scenePreload(this);
+        },
         create: function () {
           sceneCreate(this);
         },
@@ -656,6 +753,9 @@
       },
       statuses: function () {
         return runtime.statuses;
+      },
+      hasArt: function (key) {
+        return !!(runtime.scene && runtime.scene.textures.exists(key));
       },
       getView: function () {
         const scene = runtime.scene;

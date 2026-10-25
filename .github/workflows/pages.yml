@@ -31,7 +31,7 @@ jobs:
         run: |
           mkdir -p _site
           cp index.html _site/
-          cp -a css js vendor _site/
+          cp -a css js vendor draw assets _site/
 
       - name: Setup Pages
         uses: actions/configure-pages@v5

@@ -58,7 +58,10 @@
       const id = order[i];
       const resource = CFG().resources[id];
       html += '<div class="row">';
+      html += '<span class="icon">';
+      html += '<img alt="" src="assets/' + id + '.png" />';
       html += '<span class="swatch" style="background:' + CFG().hex(resource.color) + '"></span>';
+      html += "</span>";
       html += '<span class="name">' + resource.name + "</span>";
       if (mode === "items") {
         html += "<span>もち <b data-count='carry." + id + "'>0</b></span>";
@@ -385,6 +388,11 @@
     $("scrim").hidden = false;
     $("panel-title").textContent = panel.title;
     $("panel-body").innerHTML = panel.render(actions.loaded);
+    $("panel-body").querySelectorAll(".icon img").forEach(function (img) {
+      img.addEventListener("error", function () {
+        img.classList.add("missing");
+      });
+    });
     $("panel-body").scrollTop = 0;
     updatePanel(lastState, lastExtra);
     $("panel-close").focus();

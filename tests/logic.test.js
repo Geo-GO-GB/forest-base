@@ -27,6 +27,7 @@ load("js/config.js");
 load("js/layout.js");
 load("js/sim.js");
 load("js/save.js");
+load("js/sprites.js");
 
 const CFG = globalThis.GAME_CONFIG;
 const Sim = globalThis.Sim;
@@ -241,6 +242,46 @@ test("corrupt saves are quarantined and a newer version is not overwritten", fun
   assert.equal(newer.state.coins, 0);
   assert.equal(Save.save(newer.state).ok, false);
   assert.equal(ls.getItem(CFG.saveKey), future);
+});
+
+test("sprite list is one entry per placeholder the game can swap", function () {
+  const list = globalThis.SPRITE_LIST;
+  const by = globalThis.SPRITE_BY_KEY;
+  assert.equal(list.length, 19);
+  const seen = {};
+  list.forEach(function (sprite) {
+    assert.ok(!seen[sprite.key], "duplicate " + sprite.key);
+    seen[sprite.key] = true;
+    assert.equal(by[sprite.key], sprite);
+    assert.equal(sprite.file, sprite.key + ".png");
+    assert.equal(typeof sprite.name, "string");
+    assert.ok(sprite.name.length > 0, sprite.key);
+    assert.ok(sprite.width >= 16 && sprite.height >= 16, sprite.key);
+    assert.ok(sprite.displayW > 0 && sprite.displayH > 0, sprite.key);
+  });
+  const game = fs.readFileSync(path.join(__dirname, "../js/game.js"), "utf8");
+  const ui = fs.readFileSync(path.join(__dirname, "../js/ui.js"), "utf8");
+  ["player", "backpack", "helper", "twig", "pebble", "berry", "mushroom", "box", "workbench", "desk", "shop", "marker", "tree", "tree-dark", "flower", "flower-pink", "flower-white", "stone"].forEach(function (key) {
+    assert.ok(game.includes('"' + key + '"'), key);
+  });
+  assert.equal(seen.plank, true);
+  assert.ok(CFG.resourceOrder.indexOf("plank") >= 0);
+  assert.ok(ui.includes("assets/"));
+  assert.ok(game.includes('scene.load.image(sprite.key, "assets/" + sprite.file)'));
+  const drawJs = fs.readFileSync(path.join(__dirname, "../draw/draw.js"), "utf8");
+  const drawHtml = fs.readFileSync(path.join(__dirname, "../draw/index.html"), "utf8");
+  const drawCss = fs.readFileSync(path.join(__dirname, "../draw/draw.css"), "utf8");
+  const pages = fs.readFileSync(path.join(__dirname, "../.github/workflows/pages.yml"), "utf8");
+  assert.ok(drawJs.includes("himitsukichi-draw-v1"));
+  assert.ok(drawJs.includes("manifest.json"));
+  assert.ok(drawJs.includes("destination-out"));
+  assert.ok(drawJs.includes("preventDefault"));
+  assert.ok(drawHtml.includes("まとめて保存"));
+  assert.ok(drawHtml.includes("jszip@3.10.1"));
+  assert.ok(drawHtml.includes("../js/sprites.js"));
+  assert.ok(drawCss.includes("touch-action: none"));
+  assert.ok(pages.includes("draw"));
+  assert.ok(pages.includes("assets"));
 });
 
 test("the game loop does not fast-forward from savedAt", function () {
