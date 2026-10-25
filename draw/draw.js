@@ -66,7 +66,7 @@
       localStorage.setItem(STORE_KEY, JSON.stringify(data));
       return true;
     } catch (err) {
-      toast("このブラウザには、これいじょう保存できない");
+      toast("このブラウザには、これ以上保存できない");
       return false;
     }
   }
@@ -164,7 +164,7 @@
     const sprite = current();
     const flag = document.getElementById("drawn-flag");
     const drawn = !!(sprite && readStore().drawings[sprite.key]);
-    flag.textContent = drawn ? "かいた" : "まだ";
+    flag.textContent = drawn ? "描いた" : "まだ";
     flag.classList.toggle("yes", drawn);
   }
 
@@ -176,7 +176,7 @@
     document.getElementById("prev").disabled = state.index <= 0;
     document.getElementById("next").disabled = state.index >= total - 1;
     if (!sprite) {
-      document.getElementById("prompt").textContent = "えの一覧がない";
+      document.getElementById("prompt").textContent = "絵の一覧がない";
       document.getElementById("meta").textContent = "";
       return;
     }
@@ -296,7 +296,7 @@
 
   function exportZip() {
     if (typeof root.JSZip !== "function") {
-      toast("保存のしくみをよみこめなかった");
+      toast("保存の仕組みを読み込めなかった");
       return;
     }
     persist();
@@ -307,7 +307,7 @@
       if (stored.drawings[sprite.key]) drawn += 1;
     });
     if (!drawn) {
-      toast("まだえがない");
+      toast("まだ絵がない");
       return;
     }
     const zip = new root.JSZip();
@@ -378,7 +378,7 @@
     document.getElementById("undo").addEventListener("click", function () {
       const shot = state.undo.pop();
       if (!shot) {
-        toast("もどせるえがない");
+        toast("戻せる絵がない");
         return;
       }
       ctx.putImageData(shot, 0, 0);
@@ -389,7 +389,7 @@
       pushUndo();
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       persist();
-      toast("けした。ひとつもどすでもどせる");
+      toast("消した。一つ戻すで戻せる");
     });
     document.getElementById("prev").addEventListener("click", function () {
       go(state.index - 1);
@@ -403,7 +403,7 @@
 
   function boot() {
     if (!list().length) {
-      document.getElementById("prompt").textContent = "えの一覧をよみこめなかった";
+      document.getElementById("prompt").textContent = "絵の一覧を読み込めなかった";
       return;
     }
     const stored = readStore();
@@ -412,6 +412,35 @@
     selectSize(6);
     loadDrawing();
   }
+
+  function lockPageZoom() {
+    function prevent(event) {
+      event.preventDefault();
+    }
+    document.addEventListener("gesturestart", prevent, { passive: false });
+    document.addEventListener("gesturechange", prevent, { passive: false });
+    document.addEventListener("gestureend", prevent, { passive: false });
+    document.addEventListener("dblclick", prevent);
+    let lastTouch = 0;
+    document.addEventListener(
+      "touchend",
+      function (event) {
+        const now = Date.now();
+        if (now - lastTouch < 350) prevent(event);
+        lastTouch = now;
+      },
+      { passive: false }
+    );
+    document.addEventListener(
+      "touchstart",
+      function (event) {
+        if (event.touches && event.touches.length > 1) prevent(event);
+      },
+      { passive: false }
+    );
+  }
+
+  lockPageZoom();
 
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot);
   else boot();

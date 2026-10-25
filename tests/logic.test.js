@@ -230,7 +230,7 @@ test("corrupt saves are quarantined and a newer version is not overwritten", fun
   globalThis.localStorage = ls;
   ls.setItem(CFG.saveKey, "{");
   const broken = Save.load();
-  assert.match(broken.warning, /よめなかった/);
+  assert.match(broken.warning, /読めなかった/);
   assert.equal(broken.state.coins, 0);
   assert.equal(ls.getItem(CFG.saveKey), null);
   assert.equal(ls.getItem(CFG.saveKey + ":quarantine"), "{");
@@ -293,6 +293,17 @@ test("the game loop does not fast-forward from savedAt", function () {
   assert.ok(!save.includes("tickProduction"));
   assert.ok(!sim.includes("Date.now"));
   assert.equal(CFG.title, "ひみつきちつくろ");
+  assert.ok(CFG.camera.phone <= 1, "phone camera stays zoomed out");
+  assert.equal(CFG.camera.lookAhead, undefined);
+  const input = fs.readFileSync(path.join(__dirname, "../js/input.js"), "utf8");
+  const html = fs.readFileSync(path.join(__dirname, "../index.html"), "utf8");
+  const drawPage = fs.readFileSync(path.join(__dirname, "../draw/index.html"), "utf8");
+  assert.ok(input.includes("gesturestart"));
+  assert.ok(html.includes("user-scalable=no"));
+  assert.ok(html.includes("maximum-scale=1"));
+  assert.ok(drawPage.includes("user-scalable=no"));
+  assert.ok(game.includes("resolution: 1"));
+  assert.ok(!game.includes("lookAhead"));
 });
 
 if (failed) {

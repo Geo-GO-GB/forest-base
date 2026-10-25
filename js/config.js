@@ -4,50 +4,50 @@
 
   const resources = {
     twig: {
-      name: "えだ",
+      name: "枝",
       sellPrice: 1,
       gatherAmount: 1,
       respawnMs: 16000,
       special: false,
       color: 0x8d5a32,
-      blurb: "ちかづくとひろえる。うる、たてる、さぎょうだいのざいりょう",
+      blurb: "近づくと拾える。売る、建てる、作業台の材料",
     },
     pebble: {
-      name: "こいし",
+      name: "小石",
       sellPrice: 1,
       gatherAmount: 1,
       respawnMs: 16000,
       special: false,
       color: 0x8e9698,
-      blurb: "ちかづくとひろえる。たてるときに使う",
+      blurb: "近づくと拾える。建てるときに使う",
     },
     berry: {
-      name: "きのみ",
+      name: "木の実",
       sellPrice: 2,
       gatherAmount: 1,
       respawnMs: 18000,
       special: false,
       color: 0xd4534a,
-      blurb: "ちかづくとひろえる。うるとコインになる",
+      blurb: "近づくと拾える。売るとコインになる",
     },
     plank: {
-      name: "もくざい",
+      name: "木材",
       sellPrice: 4,
       gatherAmount: 0,
       respawnMs: 0,
       special: false,
       processed: true,
       color: 0xc4894a,
-      blurb: "さぎょうだいで、えだからできる",
+      blurb: "作業台で、枝から作る",
     },
     mushroom: {
-      name: "ひかるきのこ",
+      name: "光るキノコ",
       sellPrice: 8,
       gatherAmount: 1,
       respawnMs: 30000,
       special: true,
       color: 0x7a5cff,
-      blurb: "ボタンでひろう。けんきゅうづくえのざいりょう",
+      blurb: "ボタンで拾う。研究机の材料",
     },
   };
 
@@ -116,7 +116,7 @@
     baseCarry: 8,
     backpackCarry: 18,
     backpackCost: 8,
-    backpackName: "ちいさなりゅっく",
+    backpackName: "小さなリュック",
     baseStorage: 16,
     boxStorageBonus: 28,
     maxFrameMs: 100,
@@ -144,14 +144,15 @@
     helperPath: { x1: 560, y1: 1200, x2: 720, y2: 1168 },
 
     camera: {
-      phone: 1.62,
-      tablet: 1.4,
-      desktop: 1.72,
-      lookAhead: 48,
+      /* CSS 幅に対する倍率。1 より小さいほど引いて、地図が広く見える。
+         ブラウザのページ拡大とは別。実機の初期画面（旧 1.62）より引く。 */
+      phone: 1,
+      tablet: 1.05,
+      desktop: 1.2,
     },
 
     helper: {
-      name: "きこり",
+      name: "木こり",
       hireCost: 8,
       intervalMs: 2000,
       resource: "twig",
@@ -168,20 +169,20 @@
 
     buildings: {
       box: {
-        name: "きばこ",
-        effect: "ほかんがふえる",
+        name: "木箱",
+        effect: "保管が増える",
         coins: 4,
         cost: { twig: 3, pebble: 2 },
       },
       workbench: {
-        name: "さぎょうだい",
-        effect: "えだをもくざいにする",
+        name: "作業台",
+        effect: "枝を木材にする",
         coins: 8,
         cost: { twig: 4, pebble: 2 },
       },
       desk: {
-        name: "けんきゅうづくえ",
-        effect: "ひかりのはやしのきろく。つぎのふしぎのいりぐち",
+        name: "研究机",
+        effect: "光る林の記録。次の不思議への入口",
         coins: 6,
         cost: { plank: 1, mushroom: 1 },
         requiresDiscovery: true,

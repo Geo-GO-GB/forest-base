@@ -111,14 +111,14 @@
         state: fresh,
         hadSave: false,
         locked: false,
-        warning: "このブラウザではほぞんできない。遊びはできる",
+        warning: "このブラウザでは保存できない。遊びはできる",
       };
     }
     let rawText = null;
     try {
       rawText = ls.getItem(cfg().saveKey);
     } catch (err) {
-      return { state: fresh, hadSave: false, locked: false, warning: "ほぞんをよめなかった。あたらしくはじめる" };
+      return { state: fresh, hadSave: false, locked: false, warning: "保存を読めなかった。新しくはじめる" };
     }
     if (!rawText) {
       return { state: fresh, hadSave: false, locked: false, warning: "" };
@@ -129,7 +129,7 @@
       if (raw.version !== cfg().saveVersion) {
         if (typeof raw.version === "number" && raw.version > cfg().saveVersion) {
           saveLocked = true;
-          lockMessage = "セーブがこのゲームよりあたらしい。けすと、はじめから遊べる";
+          lockMessage = "セーブがこのゲームより新しい。消すと、はじめから遊べる";
           return { state: fresh, hadSave: true, locked: true, warning: lockMessage };
         }
         throw new Error("version");
@@ -146,7 +146,7 @@
         state: fresh,
         hadSave: false,
         locked: false,
-        warning: "セーブをよめなかったので、あたらしくはじめる",
+        warning: "セーブを読めなかったので、新しくはじめる",
       };
     }
   }
@@ -154,7 +154,7 @@
   function save(state) {
     if (saveLocked) return { ok: false, reason: "locked", message: lockMessage };
     const ls = store();
-    if (!ls) return { ok: false, reason: "unavailable", message: "ほぞんできない" };
+    if (!ls) return { ok: false, reason: "unavailable", message: "保存できない" };
     try {
       const copy = normalize(state);
       copy.savedAt = Date.now();
@@ -162,7 +162,7 @@
       state.savedAt = copy.savedAt;
       return { ok: true, savedAt: copy.savedAt };
     } catch (err) {
-      return { ok: false, reason: "failed", message: "ほぞんできなかった" };
+      return { ok: false, reason: "failed", message: "保存できなかった" };
     }
   }
 

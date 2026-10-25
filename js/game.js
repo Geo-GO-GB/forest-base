@@ -6,22 +6,22 @@
   "use strict";
 
   const TUTORIAL = {
-    1: "したのスティックか、WASD・やじるしキーで、えだやこいしにちかづこう",
-    2: "ひみつきちのまるいしばふにもどると、しまう",
-    3: "『うる』でコインになる。ひみつきちのうえでできる",
-    4: "『たてる』と『なかま』で、ひみつきちがはたらきだす",
+    1: "画面を触るか、WASD・矢印キーで、枝や小石に近づこう",
+    2: "秘密基地の丸い芝生に戻ると、しまう",
+    3: "「売る」でコインになる。秘密基地の上でできる",
+    4: "「建てる」と「仲間」で、秘密基地が動き出す",
   };
 
   const REASON = {
-    "carry-full": "もちきれない。ひみつきちにもどるか、りゅっくをかおう",
-    "storage-full": "ほかんがいっぱい。うるとあきができる",
-    "no-coins": "コインがたりない",
-    "no-materials": "ざいりょうがたりない",
-    locked: "まだみつけていない",
-    owned: "もうもっている",
-    built: "もうたてた",
+    "carry-full": "持ちきれない。秘密基地に戻るか、リュックを買おう",
+    "storage-full": "保管がいっぱい。売ると空きができる",
+    "no-coins": "コインが足りない",
+    "no-materials": "材料が足りない",
+    locked: "まだ見つけていない",
+    owned: "もう持っている",
+    built: "もう建てた",
     empty: "ない",
-    manual: "ボタンでひろう",
+    manual: "ボタンで拾う",
   };
 
   const runtime = {
@@ -83,10 +83,10 @@
     if (!runtime.state) return;
     const result = root.Save.save(runtime.state);
     if (result.ok) {
-      if (explicit) root.UI.toast("ほぞんした");
+      if (explicit) root.UI.toast("保存した");
       runtime.forceUi = true;
     } else if (explicit || result.reason === "failed") {
-      root.UI.toast(result.message || "ほぞんできなかった");
+      root.UI.toast(result.message || "保存できなかった");
     }
   }
 
@@ -103,7 +103,7 @@
 
   function ensureBase() {
     if (runtime.inBase) return true;
-    root.UI.toast("ひみつきちのまるいしばふにもどろう");
+    root.UI.toast("秘密基地の丸い芝生に戻ろう");
     return false;
   }
 
@@ -275,7 +275,7 @@
     floatText(node.x, node.y - 16, "+" + cfg().resources[result.type].name);
     reachTutorial(2);
     if (result.discovered) {
-      root.UI.toast("ひかるきのこをみつけた。けんきゅうづくえをたてられる");
+      root.UI.toast("光るキノコを見つけた。研究机を建てられる");
       syncBuildings();
     }
     doSave(false);
@@ -298,7 +298,7 @@
     if (!runtime.state || !ensureBase()) return;
     const deposited = root.Sim.deposit(runtime.state);
     if (deposited.moved) {
-      floatText(runtime.state.player.x, runtime.state.player.y - 28, "しまった");
+      floatText(runtime.state.player.x, runtime.state.player.y - 28, "保管した");
       reachTutorial(3);
     }
     const result = root.Sim.sell(runtime.state, id, all);
@@ -308,7 +308,7 @@
       return;
     }
     reachTutorial(4);
-    root.UI.toast(cfg().resources[id].name + "をうって、" + result.gained + "コイン");
+    root.UI.toast(cfg().resources[id].name + "を売って、" + result.gained + "コイン");
     doSave(false);
   }
 
@@ -322,7 +322,7 @@
       return;
     }
     syncBuildings();
-    root.UI.toast(cfg().buildings[id].name + "をたてた");
+    root.UI.toast(cfg().buildings[id].name + "を建てた");
     doSave(false);
   }
 
@@ -335,7 +335,7 @@
       return;
     }
     if (runtime.helper) runtime.helper.setVisible(true);
-    root.UI.toast("きこりがきた。ひらいているあいだ、えだをあつめる");
+    root.UI.toast("木こりが来た。開いているあいだ、枝を集める");
     doSave(false);
   }
 
@@ -348,7 +348,7 @@
       return;
     }
     if (runtime.pack) runtime.pack.setVisible(true);
-    root.UI.toast("ちいさなりゅっくをかった。もちものがふえた");
+    root.UI.toast("小さなリュックを買った。持ち物が増えた");
     doSave(false);
   }
 
@@ -416,10 +416,10 @@
         scene.add.ellipse(x, y, 16, 11, 0x9aa098).setStrokeStyle(2, 0x3c2f26).setDepth(20);
       }
     }
-    markDodge(scene.add.text(world.baseX, world.baseY + 78, "ひみつきち", fontStyle(18)).setOrigin(0.5).setDepth(30));
-    markDodge(scene.add.text(world.groveX, world.groveY + 108, "ひかりのはやし", fontStyle(18)).setOrigin(0.5).setDepth(30));
-    markDodge(scene.add.text(world.groveX, world.groveY + 132, "ボタンでひろう", fontStyle(14)).setOrigin(0.5).setDepth(30));
-    markDodge(scene.add.text(world.baseX + 36, (world.baseY + world.groveY) / 2, "きたへ", fontStyle(16)).setOrigin(0.5).setDepth(30));
+    markDodge(scene.add.text(world.baseX, world.baseY + 78, "秘密基地", fontStyle(18)).setOrigin(0.5).setDepth(30));
+    markDodge(scene.add.text(world.groveX, world.groveY + 108, "光る林", fontStyle(18)).setOrigin(0.5).setDepth(30));
+    markDodge(scene.add.text(world.groveX, world.groveY + 132, "ボタンで拾う", fontStyle(14)).setOrigin(0.5).setDepth(30));
+    markDodge(scene.add.text(world.baseX + 36, (world.baseY + world.groveY) / 2, "北へ", fontStyle(16)).setOrigin(0.5).setDepth(30));
   }
 
   function drawTree(scene, tree) {
@@ -458,7 +458,7 @@
       if (node.type === "mushroom") {
         const glow = scene.add.circle(0, -6, 22, 0xc9b6ff, 0.35);
         c.addAt(glow, 0);
-        c.add(markDodge(scene.add.text(0, -30, "とくべつ", fontStyle(13)).setOrigin(0.5)));
+        c.add(markDodge(scene.add.text(0, -30, "特別", fontStyle(13)).setOrigin(0.5)));
         scene.tweens.add({ targets: glow, alpha: 0.1, yoyo: true, repeat: -1, duration: 700 });
       }
       c.setDepth(100 + node.y);
@@ -479,7 +479,7 @@
       c.add(scene.add.rectangle(0, 6, 6, 12, 0xf2e2c4).setStrokeStyle(2, 0x3c2f26));
       c.add(scene.add.ellipse(0, -1, 22, 12, resource.color).setStrokeStyle(2, 0x3c2f26));
       c.add(scene.add.circle(-4, -2, 2, 0xfff4a8));
-      c.add(markDodge(scene.add.text(0, -26, "とくべつ", fontStyle(13)).setOrigin(0.5)));
+      c.add(markDodge(scene.add.text(0, -26, "特別", fontStyle(13)).setOrigin(0.5)));
       scene.tweens.add({ targets: glow, alpha: 0.12, yoyo: true, repeat: -1, duration: 700 });
     }
     c.setDepth(100 + node.y);
@@ -537,7 +537,7 @@
     } else {
       sign.add(scene.add.rectangle(0, 12, 6, 28, 0x8a5a32));
       sign.add(scene.add.rectangle(0, -6, 58, 28, 0xfff8ee).setStrokeStyle(3, 0x3c2f26));
-      sign.add(markDodge(scene.add.text(0, -6, "おみせ", fontStyle(14)).setOrigin(0.5)));
+      sign.add(markDodge(scene.add.text(0, -6, "お店", fontStyle(14)).setOrigin(0.5)));
     }
     sign.setDepth(100 + shop.y);
   }
@@ -602,18 +602,48 @@
     return camera.desktop;
   }
 
+  function cssSize(scene) {
+    const canvas = scene.game && scene.game.canvas;
+    const parent = canvas && canvas.parentElement;
+    return {
+      w: (parent && parent.clientWidth) || window.innerWidth,
+      h: (parent && parent.clientHeight) || window.innerHeight,
+    };
+  }
+
+  function ensureCanvas(scene) {
+    const css = cssSize(scene);
+    const w = Math.max(1, Math.round(css.w));
+    const h = Math.max(1, Math.round(css.h));
+    const canvas = scene.game.canvas;
+    if (canvas && (Math.abs(canvas.width - w) > 1 || Math.abs(canvas.height - h) > 1)) {
+      /* DPR が高いと Scale の自動追従が親サイズを取りこぼすことがある。 */
+      scene.scale.setParentSize(w, h);
+    }
+    return { w: w, h: h };
+  }
+
   function updateCamera(scene) {
     const cam = scene.cameras.main;
-    const zoom = zoomFor(scene.scale.width);
+    const css = ensureCanvas(scene);
+    const desired = zoomFor(css.w);
+    const bufferW = cam.width || css.w;
+    const bufferH = cam.height || css.h;
+    const ratio = bufferW / css.w;
+    const dpr = window.devicePixelRatio || 1;
+    /* バッファが devicePixelRatio 倍のときだけ、CSS ピクセル基準の見え方に戻す。 */
+    const zoom = dpr > 1.25 && Math.abs(ratio - dpr) < 0.2 ? desired * ratio : desired;
     cam.setZoom(zoom);
     const world = cfg().world;
-    const viewW = cam.width / zoom;
-    const viewH = cam.height / zoom;
+    const viewW = bufferW / zoom;
+    const viewH = bufferH / zoom;
     const player = runtime.state.player;
-    const maxX = Math.max(0, world.width - viewW);
-    const maxY = Math.max(0, world.height - viewH);
-    const scrollX = Math.max(0, Math.min(maxX, player.x - viewW / 2));
-    const scrollY = Math.max(0, Math.min(maxY, player.y - viewH / 2 - cfg().camera.lookAhead));
+    let scrollX = player.x - viewW / 2;
+    let scrollY = player.y - viewH / 2;
+    if (viewW >= world.width) scrollX = (world.width - viewW) / 2;
+    else scrollX = Math.max(0, Math.min(world.width - viewW, scrollX));
+    if (viewH >= world.height) scrollY = (world.height - viewH) / 2;
+    else scrollY = Math.max(0, Math.min(world.height - viewH, scrollY));
     cam.setScroll(scrollX, scrollY);
   }
 
@@ -626,7 +656,6 @@
 
   function sceneCreate(scene) {
     runtime.scene = scene;
-    const world = cfg().world;
     const state = runtime.state;
     drawGround(scene);
     const decor = root.Layout.generateDecor(cfg());
@@ -645,7 +674,7 @@
     runtime.player = drawPlayer(scene, state.player.x, state.player.y);
     runtime.helper = drawHelper(scene);
     const cam = scene.cameras.main;
-    cam.setBounds(0, 0, world.width, world.height);
+    cam.useBounds = false;
     updateCamera(scene);
     scene.scale.on("resize", function () {
       updateCamera(scene);
@@ -708,7 +737,7 @@
     if (!runtime.inBase || root.Sim.bagCount(state.carry) <= 0) return;
     const result = root.Sim.deposit(state);
     if (result.moved) {
-      floatText(state.player.x, state.player.y - 28, "しまった");
+      floatText(state.player.x, state.player.y - 28, "保管した");
       reachTutorial(3);
       doSave(false);
     }
@@ -718,13 +747,13 @@
   function announce(prev, next) {
     if (!prev) return;
     if (next.helper === "full" && prev.helper !== "full") {
-      root.UI.toast("きこり: ほかんがいっぱい。うるか、きばこをたてるとまたうごく");
+      root.UI.toast("木こり: 保管がいっぱい。売るか、木箱を建てるとまた動く");
     }
     if (next.workbench === "no-input" && prev.workbench !== "no-input") {
-      root.UI.toast("さぎょうだい: えだがたりない。ひろうか、きこりをやとうとすすむ");
+      root.UI.toast("作業台: 枝が足りない。拾うか、木こりを雇うと進む");
     }
     if (next.workbench === "full" && prev.workbench !== "full") {
-      root.UI.toast("さぎょうだい: ほかんがいっぱい");
+      root.UI.toast("作業台: 保管がいっぱい");
     }
   }
 
@@ -765,7 +794,7 @@
     runtime.helper.setPosition(x, y);
     runtime.helper.setDepth(100 + y);
     const code = runtime.statuses.helper;
-    runtime.helperBubble.setText(code === "full" ? "いっぱい" : code === "run" ? cfg().helper.name : "");
+    runtime.helperBubble.setText(code === "full" ? "満杯" : code === "run" ? cfg().helper.name : "");
   }
 
   function sceneUpdate(scene, time, delta) {
@@ -798,7 +827,7 @@
   function startGame(state) {
     if (runtime.started) return;
     if (!root.Phaser) {
-      root.UI.showFatal("ゲーム画面をよみこめなかった");
+      root.UI.showFatal("ゲーム画面を読み込めなかった");
       return;
     }
     runtime.started = true;
@@ -812,11 +841,13 @@
       backgroundColor: "#86b36e",
       banner: false,
       audio: { noAudio: true },
+      resolution: 1,
       scale: {
         mode: root.Phaser.Scale.RESIZE,
         autoCenter: root.Phaser.Scale.CENTER_BOTH,
         width: window.innerWidth,
         height: window.innerHeight,
+        zoom: 1,
       },
       input: { activePointers: 2 },
       scene: {
@@ -923,7 +954,7 @@
       ready: false,
     };
     if (!root.Phaser) {
-      root.UI.showFatal("ゲーム画面をよみこめなかった");
+      root.UI.showFatal("ゲーム画面を読み込めなかった");
       return;
     }
     if (params.get("play") === "1") startGame(loaded.state);

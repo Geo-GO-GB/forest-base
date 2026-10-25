@@ -20,7 +20,7 @@
   }
 
   function formatTime(ts) {
-    if (!ts) return "まだ";
+    if (!ts) return "なし";
     const date = new Date(ts);
     const pad = function (n) {
       return String(n).padStart(2, "0");
@@ -64,14 +64,14 @@
       html += "</span>";
       html += '<span class="name">' + resource.name + "</span>";
       if (mode === "items") {
-        html += "<span>もち <b data-count='carry." + id + "'>0</b></span>";
-        html += "<span>ほかん <b data-count='storage." + id + "'>0</b></span>";
+        html += "<span>所持 <b data-count='carry." + id + "'>0</b></span>";
+        html += "<span>保管 <b data-count='storage." + id + "'>0</b></span>";
         html += '<span class="note">' + resource.blurb + "</span>";
       } else {
-        html += "<span>ほかん <b data-count='storage." + id + "'>0</b> / もち <b data-count='carry." + id + "'>0</b></span>";
+        html += "<span>保管 <b data-count='storage." + id + "'>0</b> / 所持 <b data-count='carry." + id + "'>0</b></span>";
         html += "<span class='note'>" + resource.sellPrice + "コイン</span>";
-        html += '<button type="button" data-sell="' + id + '">ひとつ</button>';
-        html += '<button type="button" data-sell-all="' + id + '">ぜんぶ</button>';
+        html += '<button type="button" data-sell="' + id + '">1つ</button>';
+        html += '<button type="button" data-sell-all="' + id + '">全部</button>';
       }
       html += "</div>";
     }
@@ -81,7 +81,7 @@
   function renderItems() {
     return (
       '<p class="summary" data-summary></p>' +
-      '<p class="hint">ちかづくとひろえるものと、ボタンでひろうものがある。</p>' +
+      '<p class="hint">近づくと拾えるものと、ボタンで拾うものがある。</p>' +
       resourceRows("items")
     );
   }
@@ -96,7 +96,7 @@
       "<h3>" +
       cfg.backpackName +
       "</h3>" +
-      "<p>もちもの " +
+      "<p>持ち物 " +
       cfg.baseCarry +
       " → " +
       cfg.backpackCarry +
@@ -104,7 +104,7 @@
       "<p>コイン " +
       cfg.backpackCost +
       "</p>" +
-      '<button type="button" data-buy="backpack">かう</button>' +
+      '<button type="button" data-buy="backpack">買う</button>' +
       '<p class="note" data-buy-note></p>' +
       "</section>"
     );
@@ -113,19 +113,19 @@
   function renderBuild() {
     const cfg = CFG();
     let html = '<p class="summary" data-summary></p><p class="hint" data-base-hint></p>';
-    html += "<p class='hint'>ばしょはひみつきちのなかにきまっている。</p>";
+    html += "<p class='hint'>場所は秘密基地のなかに決まっている。</p>";
     for (let i = 0; i < cfg.buildingOrder.length; i += 1) {
       const id = cfg.buildingOrder[i];
       const def = cfg.buildings[id];
       let effect = def.effect;
       if (id === "box") {
-        effect += "（ほかん " + cfg.baseStorage + " → " + (cfg.baseStorage + cfg.boxStorageBonus) + "）";
+        effect += "（保管 " + cfg.baseStorage + " → " + (cfg.baseStorage + cfg.boxStorageBonus) + "）";
       }
       html += '<section class="offer">';
       html += "<h3>" + def.name + "</h3>";
       html += "<p>" + effect + "</p>";
       html += "<p>" + costLine(def) + "</p>";
-      html += '<button type="button" data-build="' + id + '">たてる</button>';
+      html += '<button type="button" data-build="' + id + '">建てる</button>';
       html += '<p class="note" data-build-note="' + id + '"></p>';
       html += "</section>";
     }
@@ -140,16 +140,16 @@
     return (
       '<p class="summary" data-summary></p>' +
       '<p class="hint" data-base-hint></p>' +
-      "<p>きこりが" +
+      "<p>木こりが" +
       helperName +
-      "をあつめる → さぎょうだいが" +
+      "を集める → 作業台が" +
       inputName +
       cfg.workbench.inputAmount +
       "を" +
       outputName +
       cfg.workbench.outputAmount +
-      "にする → ほかんにしまう。</p>" +
-      "<p class='hint'>ひらいているあいだだけすすむ。とじている間はふえない。</p>" +
+      "にする → 保管にしまう。</p>" +
+      "<p class='hint'>開いているあいだだけ進む。閉じている間は増えない。</p>" +
       '<section class="offer">' +
       "<h3>" +
       cfg.helper.name +
@@ -160,18 +160,18 @@
       helperName +
       "を" +
       cfg.helper.amount +
-      "こ、ほかんへ。</p>" +
+      "個、保管へ。</p>" +
       "<p>コイン " +
       cfg.helper.hireCost +
       "</p>" +
-      '<button type="button" data-hire>やとう</button>' +
+      '<button type="button" data-hire>雇う</button>' +
       '<p class="note" data-hire-note></p>' +
       '<p data-status="helper"></p>' +
       '<p class="note" data-remedy="helper"></p>' +
       '<div class="bar" data-bar-wrap="helper"><div data-bar="helper"></div></div>' +
       "</section>" +
       '<section class="offer">' +
-      "<h3>さぎょうだい</h3>" +
+      "<h3>作業台</h3>" +
       "<p>" +
       sec(cfg.workbench.intervalMs) +
       "秒ごとに" +
@@ -192,29 +192,29 @@
 
   function renderSettings(loaded) {
     return (
-      "<p>このゲームは、ひらいているあいだだけすすむ。とじている間はふえない。</p>" +
-      "<p>ひろったとき、うったとき、たてたとき、やとったとき、数秒ごと、ページをとじるときにほぞんする。</p>" +
-      "<p>データのかたち: " +
+      "<p>このゲームは、開いているあいだだけ進む。閉じている間は増えない。</p>" +
+      "<p>拾ったとき、売ったとき、建てたとき、雇ったとき、数秒ごと、ページを閉じるときに保存する。</p>" +
+      "<p>データの形: " +
       CFG().saveVersion +
       "</p>" +
       '<p id="settings-saved"></p>' +
       (loaded && loaded.warning ? "<p class='warn'>" + loaded.warning + "</p>" : "") +
-      '<button type="button" data-save>いまほぞんする</button>' +
-      '<button type="button" class="danger" data-reset>データをけす</button>' +
+      '<button type="button" data-save>今保存する</button>' +
+      '<button type="button" class="danger" data-reset>データを消す</button>' +
       '<div id="confirm" hidden>' +
-      "<p>ほんとうにけす？もとに戻せない。</p>" +
-      '<button type="button" class="danger" data-confirm-reset>けす</button>' +
+      "<p>本当に消す？もとに戻せない。</p>" +
+      '<button type="button" class="danger" data-confirm-reset>消す</button>' +
       '<button type="button" data-cancel-reset>やめる</button>' +
       "</div>"
     );
   }
 
   const panels = {
-    items: { title: "もちもの", render: renderItems },
-    shop: { title: "うる", render: renderShop },
-    build: { title: "たてる", render: renderBuild },
-    helpers: { title: "なかま", render: renderHelpers },
-    settings: { title: "せってい", render: renderSettings },
+    items: { title: "持ち物", render: renderItems },
+    shop: { title: "売る", render: renderShop },
+    build: { title: "建てる", render: renderBuild },
+    helpers: { title: "仲間", render: renderHelpers },
+    settings: { title: "設定", render: renderSettings },
   };
 
   function toast(message) {
@@ -234,17 +234,17 @@
   }
 
   function statusName(code, inputName) {
-    if (code === "run") return "はたらいている";
-    if (code === "full") return "ほかんがいっぱい";
-    if (code === "no-input") return inputName + "がたりない";
-    if (code === "off") return "まだうごいていない";
+    if (code === "run") return "働いている";
+    if (code === "full") return "保管がいっぱい";
+    if (code === "no-input") return inputName + "が足りない";
+    if (code === "off") return "まだ動いていない";
     return "";
   }
 
   function remedy(code) {
-    if (code === "full") return "うってへらすか、きばこをたてるとまたうごく";
-    if (code === "no-input") return "えだをひろうか、きこりをやとうとすすむ";
-    if (code === "run") return "ひらいているあいだだけすすむ";
+    if (code === "full") return "売って減らすか、木箱を建てるとまた動く";
+    if (code === "no-input") return "枝を拾うか、木こりを雇うと進む";
+    if (code === "run") return "開いているあいだだけ進む";
     return "";
   }
 
@@ -261,19 +261,19 @@
     const carry = root.Sim.bagCount(state.carry);
     const storage = root.Sim.bagCount(state.storage);
     $("coins").textContent = "コイン " + state.coins;
-    $("carry-label").textContent = "もち " + carry + "/" + root.Sim.carryCap(state);
-    $("storage-label").textContent = "ほかん " + storage + "/" + root.Sim.storageCap(state);
-    $("save-label").textContent = "ほぞん " + formatTime(state.savedAt);
+    $("carry-label").textContent = "所持 " + carry + "/" + root.Sim.carryCap(state);
+    $("storage-label").textContent = "保管 " + storage + "/" + root.Sim.storageCap(state);
+    $("save-label").textContent = state.savedAt ? "保存 " + formatTime(state.savedAt) : "未保存";
     const statuses = lastExtra.statuses || { helper: "off", workbench: "off" };
     const inputName = CFG().resources[CFG().workbench.input].name;
     const bits = [];
-    if (state.helperHired) bits.push("きこり: " + statusName(statuses.helper, inputName));
-    if (state.buildings.workbench) bits.push("さぎょうだい: " + statusName(statuses.workbench, inputName));
+    if (state.helperHired) bits.push("木こり: " + statusName(statuses.helper, inputName));
+    if (state.buildings.workbench) bits.push("作業台: " + statusName(statuses.workbench, inputName));
     const pill = $("status-pill");
-    pill.textContent = bits.length ? bits.join(" / ") : "あるいて、えだやこいしをあつめよう";
+    pill.textContent = bits.length ? bits.join(" / ") : "歩いて、枝や小石を集めよう";
     const action = $("action-btn");
     action.hidden = !lastExtra.nearMushroom;
-    action.textContent = "ひかるきのこをひろう";
+    action.textContent = "光るキノコを拾う";
     const hud = $("hud");
     if (hud) document.documentElement.style.setProperty("--hud-h", hud.offsetHeight + "px");
     if (current) updatePanel(state, lastExtra);
@@ -287,11 +287,11 @@
       summary.textContent =
         "コイン " +
         state.coins +
-        "　もち " +
+        "　所持 " +
         root.Sim.bagCount(state.carry) +
         "/" +
         root.Sim.carryCap(state) +
-        "　ほかん " +
+        "　保管 " +
         root.Sim.bagCount(state.storage) +
         "/" +
         root.Sim.storageCap(state);
@@ -306,8 +306,8 @@
     const hint = body.querySelector("[data-base-hint]");
     if (hint) {
       hint.textContent = extra.inBase
-        ? "ひみつきちのうえでできる"
-        : "ひみつきちのまるいしばふにもどると、うれる・たてられる・やとえる";
+        ? "秘密基地の上でできる"
+        : "秘密基地の丸い芝生に戻ると、売れる・建てられる・雇える";
     }
     body.querySelectorAll("[data-sell]").forEach(function (button) {
       const id = button.dataset.sell;
@@ -319,43 +319,43 @@
     });
     const buy = body.querySelector("[data-buy]");
     if (buy) {
-      if (state.backpack) setDisabled(buy, true, "かった");
-      else setDisabled(buy, !extra.inBase || !root.Sim.canBuyBackpack(state).ok, "かう");
+      if (state.backpack) setDisabled(buy, true, "買った");
+      else setDisabled(buy, !extra.inBase || !root.Sim.canBuyBackpack(state).ok, "買う");
     }
     const buyNote = body.querySelector("[data-buy-note]");
     if (buyNote) {
-      if (state.backpack) buyNote.textContent = "もっている";
-      else if (!extra.inBase) buyNote.textContent = "ひみつきちでもどるとかえる";
-      else if (!root.Sim.canBuyBackpack(state).ok) buyNote.textContent = "コインがたりない";
-      else buyNote.textContent = "かえる";
+      if (state.backpack) buyNote.textContent = "持っている";
+      else if (!extra.inBase) buyNote.textContent = "秘密基地に戻ると買える";
+      else if (!root.Sim.canBuyBackpack(state).ok) buyNote.textContent = "コインが足りない";
+      else buyNote.textContent = "買える";
     }
     CFG().buildingOrder.forEach(function (id) {
       const button = body.querySelector('[data-build="' + id + '"]');
       const note = body.querySelector('[data-build-note="' + id + '"]');
       if (!button) return;
       const check = root.Sim.canBuild(state, id);
-      if (state.buildings[id]) setDisabled(button, true, "できた");
-      else if (check.reason === "locked") setDisabled(button, true, "まだ");
-      else setDisabled(button, !extra.inBase || !check.ok, "たてる");
+      if (state.buildings[id]) setDisabled(button, true, "建てた");
+      else if (check.reason === "locked") setDisabled(button, true, "未発見");
+      else setDisabled(button, !extra.inBase || !check.ok, "建てる");
       if (!note) return;
-      if (state.buildings[id]) note.textContent = "できた";
-      else if (check.reason === "locked") note.textContent = "ひかりのはやしでひかるきのこをひろうとひらく";
-      else if (!extra.inBase) note.textContent = "ひみつきちでもどるとたてられる";
-      else if (check.reason === "no-coins") note.textContent = "コインがたりない";
-      else if (check.reason === "no-materials") note.textContent = "ざいりょうがたりない";
-      else note.textContent = "たてられる";
+      if (state.buildings[id]) note.textContent = "建てた";
+      else if (check.reason === "locked") note.textContent = "光る林で光るキノコを拾うと開く";
+      else if (!extra.inBase) note.textContent = "秘密基地に戻ると建てられる";
+      else if (check.reason === "no-coins") note.textContent = "コインが足りない";
+      else if (check.reason === "no-materials") note.textContent = "材料が足りない";
+      else note.textContent = "建てられる";
     });
     const hire = body.querySelector("[data-hire]");
     if (hire) {
-      if (state.helperHired) setDisabled(hire, true, "きた");
-      else setDisabled(hire, !extra.inBase || !root.Sim.canHire(state).ok, "やとう");
+      if (state.helperHired) setDisabled(hire, true, "来た");
+      else setDisabled(hire, !extra.inBase || !root.Sim.canHire(state).ok, "雇う");
     }
     const hireNote = body.querySelector("[data-hire-note]");
     if (hireNote) {
-      if (state.helperHired) hireNote.textContent = "ひみつきちではたらいている";
-      else if (!extra.inBase) hireNote.textContent = "ひみつきちでもどるとやとえる";
-      else if (!root.Sim.canHire(state).ok) hireNote.textContent = "コインがたりない";
-      else hireNote.textContent = "やとえる";
+      if (state.helperHired) hireNote.textContent = "秘密基地で働いている";
+      else if (!extra.inBase) hireNote.textContent = "秘密基地に戻ると雇える";
+      else if (!root.Sim.canHire(state).ok) hireNote.textContent = "コインが足りない";
+      else hireNote.textContent = "雇える";
     }
     const inputName = CFG().resources[CFG().workbench.input].name;
     ["helper", "workbench"].forEach(function (key) {
@@ -364,7 +364,7 @@
       const active = key === "helper" ? state.helperHired : state.buildings.workbench;
       const code = active ? extra.statuses[key] : "off";
       if (statusEl) {
-        statusEl.textContent = active ? statusName(code, inputName) : key === "helper" ? "まだきていない" : "まだない";
+        statusEl.textContent = active ? statusName(code, inputName) : key === "helper" ? "まだ来ていない" : "まだない";
       }
       if (remedyEl) remedyEl.textContent = active ? remedy(code) : "";
       const bar = body.querySelector('[data-bar="' + key + '"]');
@@ -377,7 +377,7 @@
       }
     });
     const saved = $("settings-saved");
-    if (saved) saved.textContent = "さいごにほぞん: " + formatTime(state.savedAt);
+    if (saved) saved.textContent = "最後に保存: " + formatTime(state.savedAt);
   }
 
   function openPanel(name) {
@@ -414,9 +414,9 @@
     actions = nextActions;
     const loaded = nextActions.loaded;
     const start = $("start-btn");
-    if (loaded.locked) start.textContent = "みてみる";
-    else if (loaded.hadSave) start.textContent = "つづきから";
-    else start.textContent = "はじめる";
+    if (loaded.locked) start.textContent = "見てみる";
+    else if (loaded.hadSave) start.textContent = "続きから";
+    else start.textContent = "始める";
     if (loaded.warning) $("title-note").textContent = loaded.warning;
     start.addEventListener("click", function () {
       actions.onStart();

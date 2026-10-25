@@ -2,21 +2,21 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
   <meta name="theme-color" content="#fff8ee" />
-  <meta name="apple-mobile-web-app-title" content="えをかく" />
-  <title>えをかく — ひみつきちつくろ</title>
-  <link rel="stylesheet" href="draw.css?v=1" />
+  <meta name="apple-mobile-web-app-title" content="絵を描く" />
+  <title>絵を描く — ひみつきちつくろ</title>
+  <link rel="stylesheet" href="draw.css?v=2" />
 </head>
 <body>
   <header class="top">
     <a class="back" href="../">ゲーム</a>
-    <p class="title">えをかく</p>
+    <p class="title">絵を描く</p>
     <p id="progress" class="progress">1/1</p>
   </header>
 
   <section class="prompt-block">
-    <h1 id="prompt">よみこみ中</h1>
+    <h1 id="prompt">読み込み中</h1>
     <p id="meta"></p>
     <p id="drawn-flag" class="flag">まだ</p>
   </section>
@@ -28,36 +28,36 @@
   </div>
 
   <div class="dock">
-    <div class="tool-row" aria-label="ペンのふとさ">
-      <button type="button" class="tool on" data-size="2">ほそい</button>
-      <button type="button" class="tool" data-size="6">ふつう</button>
-      <button type="button" class="tool" data-size="12">ふとい</button>
-      <button type="button" class="tool" data-size="20">ごくふと</button>
-      <button type="button" class="tool" id="eraser">けしゴム</button>
-      <button type="button" class="tool" id="undo">ひとつもどす</button>
-      <button type="button" class="tool" id="clear">けす</button>
+    <div class="tool-row" aria-label="ペンの太さ">
+      <button type="button" class="tool on" data-size="2">細い</button>
+      <button type="button" class="tool" data-size="6">普通</button>
+      <button type="button" class="tool" data-size="12">太い</button>
+      <button type="button" class="tool" data-size="20">極太</button>
+      <button type="button" class="tool" id="eraser">消しゴム</button>
+      <button type="button" class="tool" id="undo">一つ戻す</button>
+      <button type="button" class="tool" id="clear">消す</button>
     </div>
-    <div class="color-row" aria-label="いろ">
-      <button type="button" class="swatch on" data-color="#3c2f26" style="background:#3c2f26" aria-label="ちゃいろ"></button>
-      <button type="button" class="swatch" data-color="#6b4630" style="background:#6b4630" aria-label="きのみちゃ"></button>
-      <button type="button" class="swatch" data-color="#c4894a" style="background:#c4894a" aria-label="もくざいいろ"></button>
-      <button type="button" class="swatch" data-color="#e2b14a" style="background:#e2b14a" aria-label="きいろ"></button>
-      <button type="button" class="swatch" data-color="#f2d36b" style="background:#f2d36b" aria-label="あかるいきいろ"></button>
-      <button type="button" class="swatch" data-color="#3f7d4e" style="background:#3f7d4e" aria-label="みどり"></button>
-      <button type="button" class="swatch" data-color="#6e9a5a" style="background:#6e9a5a" aria-label="わかみどり"></button>
-      <button type="button" class="swatch" data-color="#d4534a" style="background:#d4534a" aria-label="あか"></button>
+    <div class="color-row" aria-label="色">
+      <button type="button" class="swatch on" data-color="#3c2f26" style="background:#3c2f26" aria-label="茶色"></button>
+      <button type="button" class="swatch" data-color="#6b4630" style="background:#6b4630" aria-label="木の実茶"></button>
+      <button type="button" class="swatch" data-color="#c4894a" style="background:#c4894a" aria-label="木材色"></button>
+      <button type="button" class="swatch" data-color="#e2b14a" style="background:#e2b14a" aria-label="黄色"></button>
+      <button type="button" class="swatch" data-color="#f2d36b" style="background:#f2d36b" aria-label="明るい黄色"></button>
+      <button type="button" class="swatch" data-color="#3f7d4e" style="background:#3f7d4e" aria-label="緑"></button>
+      <button type="button" class="swatch" data-color="#6e9a5a" style="background:#6e9a5a" aria-label="若緑"></button>
+      <button type="button" class="swatch" data-color="#d4534a" style="background:#d4534a" aria-label="赤"></button>
       <button type="button" class="swatch" data-color="#f3a3b5" style="background:#f3a3b5" aria-label="ピンク"></button>
-      <button type="button" class="swatch" data-color="#f3c7a5" style="background:#f3c7a5" aria-label="はだいろ"></button>
-      <button type="button" class="swatch" data-color="#6a4a86" style="background:#6a4a86" aria-label="むらさき"></button>
-      <button type="button" class="swatch" data-color="#7a5cff" style="background:#7a5cff" aria-label="ひかりむらさき"></button>
-      <button type="button" class="swatch" data-color="#8e9698" style="background:#8e9698" aria-label="はいいろ"></button>
-      <button type="button" class="swatch" data-color="#fffaf3" style="background:#fffaf3" aria-label="しろ"></button>
-      <label class="custom">じぶんで<input id="custom-color" type="color" value="#3c2f26" aria-label="じぶんのいろ" /></label>
+      <button type="button" class="swatch" data-color="#f3c7a5" style="background:#f3c7a5" aria-label="肌色"></button>
+      <button type="button" class="swatch" data-color="#6a4a86" style="background:#6a4a86" aria-label="紫"></button>
+      <button type="button" class="swatch" data-color="#7a5cff" style="background:#7a5cff" aria-label="光の紫"></button>
+      <button type="button" class="swatch" data-color="#8e9698" style="background:#8e9698" aria-label="灰色"></button>
+      <button type="button" class="swatch" data-color="#fffaf3" style="background:#fffaf3" aria-label="白"></button>
+      <label class="custom">自分で<input id="custom-color" type="color" value="#3c2f26" aria-label="自分の色" /></label>
     </div>
-    <p class="hint">かかなくても、つぎでとばせる。かいたえは、このブラウザに残る。</p>
+    <p class="hint">描かなくても、次で飛ばせる。描いた絵は、このブラウザに残る。</p>
     <div class="nav-row">
-      <button type="button" id="prev">まえ</button>
-      <button type="button" id="next">つぎ</button>
+      <button type="button" id="prev">前</button>
+      <button type="button" id="next">次</button>
     </div>
     <button type="button" id="export" class="save">まとめて保存</button>
   </div>
@@ -65,7 +65,7 @@
   <div id="toasts" aria-live="polite"></div>
 
   <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-  <script src="../js/sprites.js?v=1"></script>
-  <script src="draw.js?v=1"></script>
+  <script src="../js/sprites.js?v=2"></script>
+  <script src="draw.js?v=2"></script>
 </body>
 </html>

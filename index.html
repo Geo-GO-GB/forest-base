@@ -2,12 +2,12 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
   <meta name="theme-color" content="#6e9a5a" />
   <meta name="apple-mobile-web-app-title" content="ひみつきちつくろ" />
   <title>ひみつきちつくろ</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='16' fill='%236e9a5a'/%3E%3Ccircle cx='16' cy='14' r='6' fill='%23f3c7a5'/%3E%3C/svg%3E" />
-  <link rel="stylesheet" href="css/style.css?v=3" />
+  <link rel="stylesheet" href="css/style.css?v=4" />
 </head>
 <body>
   <div id="game-root"></div>
@@ -16,16 +16,16 @@
     <div class="title-card">
       <p class="eyebrow">ブラウザでそのまま</p>
       <h1>ひみつきちつくろ</h1>
-      <p class="lead">もりであるいて、ひみつきちをそだてよう</p>
+      <p class="lead">森を歩いて、秘密基地を育てよう</p>
       <ul class="title-points">
-        <li>えだ・こいし・きのみは、ちかづくとひろえる</li>
-        <li>ひかるきのこは、ボタンでひろう</li>
-        <li>スマートフォンはしたのスティック。パソコンは WASD か、やじるしキー</li>
-        <li>とじている間は、すすまない</li>
+        <li>枝・小石・木の実は、近づくと拾える</li>
+        <li>光るキノコは、ボタンで拾う</li>
+        <li>スマートフォンは画面を触って移動。パソコンは WASD か、矢印キー</li>
+        <li>閉じている間は、進まない</li>
       </ul>
-      <button type="button" id="start-btn">はじめる</button>
+      <button type="button" id="start-btn">始める</button>
       <p id="title-note"></p>
-      <p class="draw-link"><a href="draw/">えをかく</a></p>
+      <p class="draw-link"><a href="draw/">絵を描く</a></p>
     </div>
   </section>
 
@@ -33,32 +33,32 @@
     <div class="hud-top">
       <p class="logo">ひみつきちつくろ</p>
       <p class="coins" id="coins">コイン 0</p>
-      <button type="button" id="btn-settings" data-panel="settings">せってい</button>
+      <button type="button" id="btn-settings" data-panel="settings">設定</button>
     </div>
     <p class="hud-mid">
-      <span id="carry-label">もち 0/8</span>
-      <span id="storage-label">ほかん 0/16</span>
-      <span id="save-label">ほぞん まだ</span>
+      <span id="carry-label">所持 0/8</span>
+      <span id="storage-label">保管 0/16</span>
+      <span id="save-label">未保存</span>
     </p>
-    <p id="status-pill" class="hud-status">あるいて、えだやこいしをあつめよう</p>
+    <p id="status-pill" class="hud-status">歩いて、枝や小石を集めよう</p>
   </header>
 
   <nav class="side-buttons" aria-label="メニュー">
-    <button type="button" data-panel="items">もちもの</button>
-    <button type="button" data-panel="shop">うる</button>
-    <button type="button" data-panel="build">たてる</button>
-    <button type="button" data-panel="helpers">なかま</button>
+    <button type="button" data-panel="items">持ち物</button>
+    <button type="button" data-panel="shop">売る</button>
+    <button type="button" data-panel="build">建てる</button>
+    <button type="button" data-panel="helpers">仲間</button>
   </nav>
 
   <div id="stick" aria-hidden="true"><div class="knob"></div></div>
-  <button type="button" id="action-btn" hidden>ひかるきのこをひろう</button>
+  <button type="button" id="action-btn" hidden>光るキノコを拾う</button>
   <div id="toasts" aria-live="polite"></div>
 
   <div id="scrim" hidden>
     <div class="panel" role="dialog" aria-modal="true" aria-labelledby="panel-title">
       <div class="panel-head">
         <h2 id="panel-title"></h2>
-        <button type="button" id="panel-close">とじる</button>
+        <button type="button" id="panel-close">閉じる</button>
       </div>
       <div id="panel-body"></div>
     </div>
@@ -67,13 +67,13 @@
   <noscript><p>ひみつきちつくろ を遊ぶには、JavaScript をオンにしてください。</p></noscript>
 
   <script src="vendor/phaser.min.js?v=1"></script>
-  <script src="js/config.js?v=1"></script>
+  <script src="js/config.js?v=2"></script>
   <script src="js/layout.js?v=1"></script>
   <script src="js/sim.js?v=1"></script>
-  <script src="js/save.js?v=1"></script>
-  <script src="js/input.js?v=1"></script>
-  <script src="js/sprites.js?v=1"></script>
-  <script src="js/ui.js?v=2"></script>
-  <script src="js/game.js?v=3"></script>
+  <script src="js/save.js?v=2"></script>
+  <script src="js/input.js?v=2"></script>
+  <script src="js/sprites.js?v=2"></script>
+  <script src="js/ui.js?v=3"></script>
+  <script src="js/game.js?v=5"></script>
 </body>
 </html>
