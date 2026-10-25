@@ -372,7 +372,10 @@
     const w = displayW || (spec && spec.displayW) || image.width;
     const h = displayH || (spec && spec.displayH) || image.height;
     image.setDisplaySize(w, h);
-    image.setOrigin(0.5, spec && spec.anchorY != null ? spec.anchorY : 0.5);
+    image.setOrigin(
+      spec && spec.anchorX != null ? spec.anchorX : 0.5,
+      spec && spec.anchorY != null ? spec.anchorY : 0.5
+    );
     return image;
   }
 
@@ -428,7 +431,7 @@
     const spec = root.SPRITE_BY_KEY[key];
     const art = spec ? placeArt(scene, key, spec.displayW * tree.scale, spec.displayH * tree.scale) : null;
     if (art) {
-      art.setPosition(0, 4);
+      art.setPosition(0, 2);
       c.add(art);
     } else {
       const h = 34 * tree.scale;
@@ -458,7 +461,7 @@
       if (node.type === "mushroom") {
         const glow = scene.add.circle(0, -6, 22, 0xc9b6ff, 0.35);
         c.addAt(glow, 0);
-        c.add(markDodge(scene.add.text(0, -30, "特別", fontStyle(13)).setOrigin(0.5)));
+        c.add(markDodge(scene.add.text(0, -44, "特別", fontStyle(13)).setOrigin(0.5)));
         scene.tweens.add({ targets: glow, alpha: 0.1, yoyo: true, repeat: -1, duration: 700 });
       }
       c.setDepth(100 + node.y);
@@ -479,7 +482,7 @@
       c.add(scene.add.rectangle(0, 6, 6, 12, 0xf2e2c4).setStrokeStyle(2, 0x3c2f26));
       c.add(scene.add.ellipse(0, -1, 22, 12, resource.color).setStrokeStyle(2, 0x3c2f26));
       c.add(scene.add.circle(-4, -2, 2, 0xfff4a8));
-      c.add(markDodge(scene.add.text(0, -26, "特別", fontStyle(13)).setOrigin(0.5)));
+      c.add(markDodge(scene.add.text(0, -42, "特別", fontStyle(13)).setOrigin(0.5)));
       scene.tweens.add({ targets: glow, alpha: 0.12, yoyo: true, repeat: -1, duration: 700 });
     }
     c.setDepth(100 + node.y);
@@ -490,7 +493,7 @@
     if (id === "box" || id === "workbench" || id === "desk") {
       const art = placeArt(scene, id);
       if (art) {
-        art.setPosition(0, 12);
+        art.setPosition(0, 14);
         parent.add(art);
         return;
       }
@@ -532,7 +535,7 @@
     const sign = scene.add.container(shop.x, shop.y);
     const shopArt = placeArt(scene, "shop");
     if (shopArt) {
-      shopArt.setPosition(0, 10);
+      shopArt.setPosition(0, 12);
       sign.add(shopArt);
     } else {
       sign.add(scene.add.rectangle(0, 12, 6, 28, 0x8a5a32));
@@ -547,7 +550,7 @@
     c.add(scene.add.ellipse(0, 20, 34, 12, 0x000000, 0.18));
     const body = placeArt(scene, "player");
     if (body) {
-      body.setPosition(0, 18);
+      body.setPosition(0, 20);
       c.add(body);
     } else {
       c.add(scene.add.ellipse(0, 8, 26, 30, 0x3f7d4e).setStrokeStyle(2, 0x3c2f26));
@@ -558,7 +561,7 @@
     }
     const packArt = placeArt(scene, "backpack");
     if (packArt) {
-      packArt.setPosition(-20, 6);
+      packArt.setPosition(-16, -6);
       runtime.pack = packArt;
     } else {
       runtime.pack = scene.add.rectangle(-14, 6, 12, 16, 0x8a5a32).setStrokeStyle(2, 0x3c2f26);
@@ -579,7 +582,7 @@
     c.add(scene.add.ellipse(0, 18, 26, 10, 0x000000, 0.18));
     const art = placeArt(scene, "helper");
     if (art) {
-      art.setPosition(0, 16);
+      art.setPosition(0, 18);
       c.add(art);
     } else {
       c.add(scene.add.ellipse(0, 6, 22, 26, 0x8a5a32).setStrokeStyle(2, 0x3c2f26));
@@ -588,7 +591,7 @@
       c.add(scene.add.circle(-3.5, -12, 1.3, 0x2c241c));
       c.add(scene.add.circle(3.5, -12, 1.3, 0x2c241c));
     }
-    runtime.helperBubble = markDodge(scene.add.text(0, -36, "", fontStyle(13)).setOrigin(0.5));
+    runtime.helperBubble = markDodge(scene.add.text(0, -52, "", fontStyle(13)).setOrigin(0.5));
     c.add(runtime.helperBubble);
     c.setVisible(runtime.state.helperHired);
     c.setDepth(100 + path.y1);
