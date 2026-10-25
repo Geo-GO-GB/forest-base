@@ -48,6 +48,7 @@
     lastCarryToast: 0,
     lastStorageToast: 0,
     helperPhase: 0,
+    dodge: [],
   };
 
   function cfg() {
@@ -106,16 +107,137 @@
     return false;
   }
 
+  function markDodge(text) {
+    text.setData("homeX", text.x);
+    text.setData("homeY", text.y);
+    runtime.dodge.push(text);
+    return text;
+  }
+
+  function uiRect(el) {
+    if (!el) return null;
+    const style = getComputedStyle(el);
+    if (style.display === "none" || style.visibility === "hidden") return null;
+    const rect = el.getBoundingClientRect();
+    if (rect.width < 1 || rect.height < 1) return null;
+    return { x: rect.left, y: rect.top, w: rect.width, h: rect.height };
+  }
+
+  function unionRect(list) {
+    let rect = null;
+    list.forEach(function (next) {
+      if (!next) return;
+      if (!rect) {
+        rect = { x: next.x, y: next.y, w: next.w, h: next.h };
+        return;
+      }
+      const right = Math.max(rect.x + rect.w, next.x + next.w);
+      const bottom = Math.max(rect.y + rect.h, next.y + next.h);
+      rect.x = Math.min(rect.x, next.x);
+      rect.y = Math.min(rect.y, next.y);
+      rect.w = right - rect.x;
+      rect.h = bottom - rect.y;
+    });
+    return rect;
+  }
+
+  function textShown(text) {
+    let node = text;
+    while (node) {
+      if (node.visible === false) return false;
+      node = node.parentContainer;
+    }
+    return true;
+  }
+
+  function textScreen(text) {
+    const cam = runtime.scene.cameras.main;
+    const bounds = text.getBounds();
+    return {
+      x: (bounds.x - cam.scrollX) * cam.zoom - 2,
+      y: (bounds.y - cam.scrollY) * cam.zoom - 2,
+      w: bounds.width * cam.zoom + 4,
+      h: bounds.height * cam.zoom + 4,
+    };
+  }
+
+  function rectHits(a, b) {
+    return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+  }
+
+  function dodgeLabels() {
+    if (!runtime.scene || document.body.classList.contains("panel-open")) return;
+    const buttons = [];
+    document.querySelectorAll(".side-buttons button").forEach(function (button) {
+      buttons.push(uiRect(button));
+    });
+    const toastHost = document.getElementById("toasts");
+    const toastBox = toastHost && toastHost.childElementCount ? uiRect(toastHost) : null;
+    const banner = unionRect([uiRect(document.getElementById("hud")), toastBox].filter(Boolean));
+    const obstacles = [banner, uiRect(document.getElementById("stick")), uiRect(document.getElementById("action-btn")), unionRect(buttons)].filter(Boolean);
+    const cam = runtime.scene.cameras.main;
+    const view = { w: cam.width, h: cam.height, zoom: cam.zoom };
+    runtime.dodge.forEach(function (text) {
+      dodgeOne(text, obstacles, view);
+    });
+  }
+
+  function fits(rect, obstacles, view) {
+    if (rect.x < 1 || rect.y < 1 || rect.x + rect.w > view.w - 1 || rect.y + rect.h > view.h - 1) return false;
+    for (let i = 0; i < obstacles.length; i += 1) {
+      if (rectHits(rect, obstacles[i])) return false;
+    }
+    return true;
+  }
+
+  function nearestClear(rect, obstacles, view) {
+    let best = null;
+    function consider(x, y) {
+      const next = { x: x, y: y, w: rect.w, h: rect.h };
+      if (!fits(next, obstacles, view)) return;
+      const cost = (x - rect.x) * (x - rect.x) + (y - rect.y) * (y - rect.y);
+      if (!best || cost < best.cost) best = { x: x - rect.x, y: y - rect.y, cost: cost };
+    }
+    consider(rect.x, rect.y);
+    obstacles.forEach(function (obstacle) {
+      consider(rect.x, obstacle.y - rect.h - 6);
+      consider(rect.x, obstacle.y + obstacle.h + 6);
+      consider(obstacle.x - rect.w - 6, rect.y);
+      consider(obstacle.x + obstacle.w + 6, rect.y);
+    });
+    return best;
+  }
+
+  function dodgeOne(text, obstacles, view) {
+    if (!textShown(text) || !text.text) return;
+    if (typeof text.updateText === "function") text.updateText();
+    const homeX = text.getData("homeX");
+    const homeY = text.getData("homeY");
+    const zoom = view.zoom || 1;
+    text.setPosition(homeX, homeY);
+    const origin = textScreen(text);
+    if (origin.x + origin.w < 0 || origin.y + origin.h < 0 || origin.x > view.w || origin.y > view.h) return;
+    let rect = { x: origin.x, y: origin.y, w: origin.w, h: origin.h };
+    if (rect.x < 2) rect.x = 2;
+    if (rect.y < 2) rect.y = 2;
+    if (rect.x + rect.w > view.w - 2) rect.x = view.w - 2 - rect.w;
+    if (rect.y + rect.h > view.h - 2) rect.y = view.h - 2 - rect.h;
+    const shift = nearestClear(rect, obstacles, view);
+    if (!shift) return;
+    text.setPosition(homeX + (rect.x + shift.x - origin.x) / zoom, homeY + (rect.y + shift.y - origin.y) / zoom);
+  }
+
   function floatText(x, y, text) {
     const scene = runtime.scene;
     if (!scene) return;
-    const label = scene.add.text(x, y, text, fontStyle(16, "#fffaf3")).setOrigin(0.5).setDepth(6000);
+    const label = markDodge(scene.add.text(x, y - 18, text, fontStyle(16, "#fffaf3")).setOrigin(0.5).setDepth(6000));
     scene.tweens.add({
       targets: label,
-      y: y - 34,
       alpha: 0,
       duration: 700,
       onComplete: function () {
+        const index = runtime.dodge.indexOf(label);
+        if (index >= 0) runtime.dodge.splice(index, 1);
         label.destroy();
       },
     });
@@ -294,10 +416,10 @@
         scene.add.ellipse(x, y, 16, 11, 0x9aa098).setStrokeStyle(2, 0x3c2f26).setDepth(20);
       }
     }
-    scene.add.text(world.baseX, world.baseY + 78, "ひみつきち", fontStyle(18)).setOrigin(0.5).setDepth(30);
-    scene.add.text(world.groveX, world.groveY + 108, "ひかりのはやし", fontStyle(18)).setOrigin(0.5).setDepth(30);
-    scene.add.text(world.groveX, world.groveY + 132, "ボタンでひろう", fontStyle(14)).setOrigin(0.5).setDepth(30);
-    scene.add.text(world.baseX + 36, (world.baseY + world.groveY) / 2, "きたへ", fontStyle(16)).setOrigin(0.5).setDepth(30);
+    markDodge(scene.add.text(world.baseX, world.baseY + 78, "ひみつきち", fontStyle(18)).setOrigin(0.5).setDepth(30));
+    markDodge(scene.add.text(world.groveX, world.groveY + 108, "ひかりのはやし", fontStyle(18)).setOrigin(0.5).setDepth(30));
+    markDodge(scene.add.text(world.groveX, world.groveY + 132, "ボタンでひろう", fontStyle(14)).setOrigin(0.5).setDepth(30));
+    markDodge(scene.add.text(world.baseX + 36, (world.baseY + world.groveY) / 2, "きたへ", fontStyle(16)).setOrigin(0.5).setDepth(30));
   }
 
   function drawTree(scene, tree) {
@@ -336,7 +458,7 @@
       if (node.type === "mushroom") {
         const glow = scene.add.circle(0, -6, 22, 0xc9b6ff, 0.35);
         c.addAt(glow, 0);
-        c.add(scene.add.text(0, -30, "とくべつ", fontStyle(13)).setOrigin(0.5));
+        c.add(markDodge(scene.add.text(0, -30, "とくべつ", fontStyle(13)).setOrigin(0.5)));
         scene.tweens.add({ targets: glow, alpha: 0.1, yoyo: true, repeat: -1, duration: 700 });
       }
       c.setDepth(100 + node.y);
@@ -357,7 +479,7 @@
       c.add(scene.add.rectangle(0, 6, 6, 12, 0xf2e2c4).setStrokeStyle(2, 0x3c2f26));
       c.add(scene.add.ellipse(0, -1, 22, 12, resource.color).setStrokeStyle(2, 0x3c2f26));
       c.add(scene.add.circle(-4, -2, 2, 0xfff4a8));
-      c.add(scene.add.text(0, -26, "とくべつ", fontStyle(13)).setOrigin(0.5));
+      c.add(markDodge(scene.add.text(0, -26, "とくべつ", fontStyle(13)).setOrigin(0.5)));
       scene.tweens.add({ targets: glow, alpha: 0.12, yoyo: true, repeat: -1, duration: 700 });
     }
     c.setDepth(100 + node.y);
@@ -401,7 +523,7 @@
       const built = scene.add.container(0, 0);
       drawBuildingArt(scene, id, built);
       built.setVisible(false);
-      const label = scene.add.text(0, -30, cfg().buildings[id].name, fontStyle(14)).setOrigin(0.5);
+      const label = markDodge(scene.add.text(0, -30, cfg().buildings[id].name, fontStyle(14)).setOrigin(0.5));
       rootC.add([marker, built, label]);
       rootC.setDepth(100 + pos.y);
       runtime.slots[id] = { root: rootC, marker: marker, built: built, label: label };
@@ -415,7 +537,7 @@
     } else {
       sign.add(scene.add.rectangle(0, 12, 6, 28, 0x8a5a32));
       sign.add(scene.add.rectangle(0, -6, 58, 28, 0xfff8ee).setStrokeStyle(3, 0x3c2f26));
-      sign.add(scene.add.text(0, -6, "おみせ", fontStyle(14)).setOrigin(0.5));
+      sign.add(markDodge(scene.add.text(0, -6, "おみせ", fontStyle(14)).setOrigin(0.5)));
     }
     sign.setDepth(100 + shop.y);
   }
@@ -466,7 +588,7 @@
       c.add(scene.add.circle(-3.5, -12, 1.3, 0x2c241c));
       c.add(scene.add.circle(3.5, -12, 1.3, 0x2c241c));
     }
-    runtime.helperBubble = scene.add.text(0, -36, "", fontStyle(13)).setOrigin(0.5);
+    runtime.helperBubble = markDodge(scene.add.text(0, -36, "", fontStyle(13)).setOrigin(0.5));
     c.add(runtime.helperBubble);
     c.setVisible(runtime.state.helperHired);
     c.setDepth(100 + path.y1);
@@ -657,6 +779,7 @@
     updateProduction(step, time);
     syncNodes();
     updateHelper(step);
+    dodgeLabels();
     if (runtime.pack) runtime.pack.setVisible(runtime.state.backpack);
     const near = nearestMushroom();
     runtime.nearId = near ? near.id : null;
@@ -756,6 +879,28 @@
       },
       hasArt: function (key) {
         return !!(runtime.scene && runtime.scene.textures.exists(key));
+      },
+      getTexts: function () {
+        const scene = runtime.scene;
+        if (!scene) return [];
+        const cam = scene.cameras.main;
+        const found = [];
+        const visit = function (node) {
+          if (!node || node.visible === false) return;
+          if (node.type === "Text" && node.text) {
+            const bounds = node.getBounds();
+            found.push({
+              text: node.text,
+              x: (bounds.x - cam.scrollX) * cam.zoom,
+              y: (bounds.y - cam.scrollY) * cam.zoom,
+              w: bounds.width * cam.zoom,
+              h: bounds.height * cam.zoom,
+            });
+          }
+          if (node.list) node.list.forEach(visit);
+        };
+        scene.children.list.forEach(visit);
+        return found;
       },
       getView: function () {
         const scene = runtime.scene;
