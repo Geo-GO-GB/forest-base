@@ -307,7 +307,7 @@
     if (hint) {
       hint.textContent = extra.inBase
         ? "秘密基地の上でできる"
-        : "秘密基地の丸い芝生に戻ると、売れる・建てられる・雇える";
+        : "秘密基地に戻ると、売れる・建てられる・雇える";
     }
     body.querySelectorAll("[data-sell]").forEach(function (button) {
       const id = button.dataset.sell;

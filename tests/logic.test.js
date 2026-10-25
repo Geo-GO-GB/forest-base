@@ -284,6 +284,30 @@ test("sprite list is one entry per placeholder the game can swap", function () {
   assert.ok(pages.includes("assets"));
 });
 
+test("approved art scales and walk speed stay on the manifest", function () {
+  const art = CFG.art;
+  assert.equal(CFG.playerSpeed, 110);
+  assert.equal(art.characters, 0.55);
+  assert.equal(art.trees, 1.4);
+  assert.equal(art.base, 1.25);
+  assert.equal(art.flowers, 1);
+  assert.equal(art.stone, 1);
+  assert.equal(art.furniture, 1);
+  assert.equal(art.pickups.twig, 0.4);
+  assert.equal(art.pickups.pebble, 0.6);
+  assert.equal(art.pickups.berry, 0.63);
+  assert.equal(art.pickups.plank, 0.54);
+  assert.equal(art.pickups.mushroom, 0.47);
+  assert.equal(art.pickups.backpack, 0.51);
+  assert.equal(art.walkFps, 14);
+  assert.equal(art.idleFps, 2);
+  assert.equal(art.swayFps, 3);
+  assert.equal(art.shadowW, 28);
+  assert.equal(art.shadowH, 8);
+  assert.equal(art.feetY, 126);
+  assert.equal(art.frame, 128);
+});
+
 test("the game loop does not fast-forward from savedAt", function () {
   const game = fs.readFileSync(path.join(__dirname, "../js/game.js"), "utf8");
   const save = fs.readFileSync(path.join(__dirname, "../js/save.js"), "utf8");
