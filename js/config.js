@@ -4,50 +4,50 @@
 
   const resources = {
     twig: {
-      name: "えだ",
+      name: "枝",
       sellPrice: 1,
       gatherAmount: 1,
       respawnMs: 16000,
       special: false,
       color: 0x8d5a32,
-      blurb: "ちかづくとひろえる。うる、たてる、さぎょうだいのざいりょう",
+      blurb: "近づくと拾える。売る、建てる、作業台の材料",
     },
     pebble: {
-      name: "こいし",
+      name: "小石",
       sellPrice: 1,
       gatherAmount: 1,
       respawnMs: 16000,
       special: false,
       color: 0x8e9698,
-      blurb: "ちかづくとひろえる。たてるときに使う",
+      blurb: "近づくと拾える。建てるときに使う",
     },
     berry: {
-      name: "きのみ",
+      name: "木の実",
       sellPrice: 2,
       gatherAmount: 1,
       respawnMs: 18000,
       special: false,
       color: 0xd4534a,
-      blurb: "ちかづくとひろえる。うるとコインになる",
+      blurb: "近づくと拾える。売るとコインになる",
     },
     plank: {
-      name: "もくざい",
+      name: "木材",
       sellPrice: 4,
       gatherAmount: 0,
       respawnMs: 0,
       special: false,
       processed: true,
       color: 0xc4894a,
-      blurb: "さぎょうだいで、えだからできる",
+      blurb: "作業台で、枝から作る",
     },
     mushroom: {
-      name: "ひかるきのこ",
+      name: "光るキノコ",
       sellPrice: 8,
       gatherAmount: 1,
       respawnMs: 30000,
       special: true,
       color: 0x7a5cff,
-      blurb: "ボタンでひろう。けんきゅうづくえのざいりょう",
+      blurb: "ボタンで拾う。研究机の材料",
     },
   };
 
@@ -58,10 +58,10 @@
   }
 
   const nodes = [
-    node("twig", 1, 640, 1060),
+    node("twig", 1, 780, 1020),
     node("twig", 2, 470, 1160),
     node("twig", 3, 820, 1180),
-    node("twig", 4, 500, 1420),
+    node("twig", 4, 360, 1180),
     node("twig", 5, 700, 960),
     node("twig", 6, 540, 540),
     node("twig", 7, 980, 1120),
@@ -72,7 +72,7 @@
     node("twig", 12, 960, 1340),
     node("twig", 13, 1080, 1380),
     node("twig", 14, 1160, 1320),
-    node("pebble", 1, 780, 1460),
+    node("pebble", 1, 1020, 1500),
     node("pebble", 2, 430, 1280),
     node("pebble", 3, 560, 820),
     node("pebble", 4, 700, 420),
@@ -82,7 +82,7 @@
     node("pebble", 8, 380, 1000),
     node("pebble", 9, 900, 980),
     node("pebble", 10, 1040, 900),
-    node("berry", 1, 690, 1500),
+    node("berry", 1, 250, 1580),
     node("berry", 2, 860, 1280),
     node("berry", 3, 730, 680),
     node("berry", 4, 300, 600),
@@ -110,13 +110,14 @@
     fontFamily:
       '"Hiragino Maru Gothic ProN", "Yu Gothic", "YuGothic", "Hiragino Sans", "Noto Sans JP", "WenQuanYi Micro Hei", "Droid Sans Fallback", sans-serif',
 
-    playerSpeed: 190,
+    /* 110 は表示倍率 0.55 のときの世界座標 px/s。歩き 14fps の 4 コマが約 0.29 秒。 */
+    playerSpeed: 110,
     autoCollectRadius: 48,
     interactRadius: 62,
     baseCarry: 8,
     backpackCarry: 18,
     backpackCost: 8,
-    backpackName: "ちいさなりゅっく",
+    backpackName: "小さなリュック",
     baseStorage: 16,
     boxStorageBonus: 28,
     maxFrameMs: 100,
@@ -134,24 +135,67 @@
       groveRadius: 150,
     },
 
+    /* 小屋（base.png × 1.25、足元が拠点の中心）の外に置く。机とお店は左右、木箱と作業台は手前。 */
     slots: {
-      box: { x: 560, y: 1340 },
-      workbench: { x: 730, y: 1330 },
-      desk: { x: 640, y: 1188 },
-      shop: { x: 720, y: 1224 },
+      box: { x: 545, y: 1392 },
+      workbench: { x: 755, y: 1392 },
+      desk: { x: 500, y: 1508 },
+      shop: { x: 760, y: 1524 },
     },
 
-    helperPath: { x1: 560, y1: 1200, x2: 720, y2: 1168 },
+    helperPath: { x1: 620, y1: 1468, x2: 680, y2: 1468 },
+
+    /* manifest.json v5 の ingame。表示倍率はこの値のまま使う。 */
+    art: {
+      characters: 0.55,
+      trees: 1.4,
+      base: 1.25,
+      flowers: 1,
+      stone: 1,
+      furniture: 1,
+      pickups: {
+        twig: 0.4,
+        pebble: 0.6,
+        berry: 0.63,
+        plank: 0.54,
+        mushroom: 0.47,
+        backpack: 0.51,
+      },
+      walkFps: 14,
+      idleFps: 2,
+      swayFps: 3,
+      feetY: 126,
+      frame: 128,
+      shadowW: 28,
+      shadowH: 8,
+      bodyRadius: 11,
+      trunkRadius: 15,
+      pathWidth: 188,
+      pond: { x: 200, y: 455, w: 240, h: 150 },
+      /* 扉の手前（拠点の中心）は歩ける。壁と屋根だけ止める。 */
+      hut: { dx: 0, dy: -100, rx: 92, ry: 48 },
+      stones: [
+        { x: 360, y: 1040 },
+        { x: 930, y: 1080 },
+        { x: 250, y: 1360 },
+        { x: 1040, y: 1320 },
+        { x: 160, y: 640 },
+        { x: 1100, y: 780 },
+        { x: 420, y: 1560 },
+        { x: 900, y: 1580 },
+      ],
+    },
 
     camera: {
-      phone: 1.62,
-      tablet: 1.4,
-      desktop: 1.72,
-      lookAhead: 48,
+      /* CSS 幅に対する倍率。1 より小さいほど引いて、地図が広く見える。
+         ブラウザのページ拡大とは別。実機の初期画面（旧 1.62）より引く。 */
+      phone: 1,
+      tablet: 1.05,
+      desktop: 1.2,
     },
 
     helper: {
-      name: "きこり",
+      name: "木こり",
       hireCost: 8,
       intervalMs: 2000,
       resource: "twig",
@@ -168,20 +212,20 @@
 
     buildings: {
       box: {
-        name: "きばこ",
-        effect: "ほかんがふえる",
+        name: "木箱",
+        effect: "保管が増える",
         coins: 4,
         cost: { twig: 3, pebble: 2 },
       },
       workbench: {
-        name: "さぎょうだい",
-        effect: "えだをもくざいにする",
+        name: "作業台",
+        effect: "枝を木材にする",
         coins: 8,
         cost: { twig: 4, pebble: 2 },
       },
       desk: {
-        name: "けんきゅうづくえ",
-        effect: "ひかりのはやしのきろく。つぎのふしぎのいりぐち",
+        name: "研究机",
+        effect: "光る林の記録。次の不思議への入口",
         coins: 6,
         cost: { plank: 1, mushroom: 1 },
         requiresDiscovery: true,

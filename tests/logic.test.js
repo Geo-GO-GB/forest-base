@@ -230,7 +230,7 @@ test("corrupt saves are quarantined and a newer version is not overwritten", fun
   globalThis.localStorage = ls;
   ls.setItem(CFG.saveKey, "{");
   const broken = Save.load();
-  assert.match(broken.warning, /よめなかった/);
+  assert.match(broken.warning, /読めなかった/);
   assert.equal(broken.state.coins, 0);
   assert.equal(ls.getItem(CFG.saveKey), null);
   assert.equal(ls.getItem(CFG.saveKey + ":quarantine"), "{");
@@ -284,6 +284,30 @@ test("sprite list is one entry per placeholder the game can swap", function () {
   assert.ok(pages.includes("assets"));
 });
 
+test("approved art scales and walk speed stay on the manifest", function () {
+  const art = CFG.art;
+  assert.equal(CFG.playerSpeed, 110);
+  assert.equal(art.characters, 0.55);
+  assert.equal(art.trees, 1.4);
+  assert.equal(art.base, 1.25);
+  assert.equal(art.flowers, 1);
+  assert.equal(art.stone, 1);
+  assert.equal(art.furniture, 1);
+  assert.equal(art.pickups.twig, 0.4);
+  assert.equal(art.pickups.pebble, 0.6);
+  assert.equal(art.pickups.berry, 0.63);
+  assert.equal(art.pickups.plank, 0.54);
+  assert.equal(art.pickups.mushroom, 0.47);
+  assert.equal(art.pickups.backpack, 0.51);
+  assert.equal(art.walkFps, 14);
+  assert.equal(art.idleFps, 2);
+  assert.equal(art.swayFps, 3);
+  assert.equal(art.shadowW, 28);
+  assert.equal(art.shadowH, 8);
+  assert.equal(art.feetY, 126);
+  assert.equal(art.frame, 128);
+});
+
 test("the game loop does not fast-forward from savedAt", function () {
   const game = fs.readFileSync(path.join(__dirname, "../js/game.js"), "utf8");
   const save = fs.readFileSync(path.join(__dirname, "../js/save.js"), "utf8");
@@ -293,6 +317,17 @@ test("the game loop does not fast-forward from savedAt", function () {
   assert.ok(!save.includes("tickProduction"));
   assert.ok(!sim.includes("Date.now"));
   assert.equal(CFG.title, "ひみつきちつくろ");
+  assert.ok(CFG.camera.phone <= 1, "phone camera stays zoomed out");
+  assert.equal(CFG.camera.lookAhead, undefined);
+  const input = fs.readFileSync(path.join(__dirname, "../js/input.js"), "utf8");
+  const html = fs.readFileSync(path.join(__dirname, "../index.html"), "utf8");
+  const drawPage = fs.readFileSync(path.join(__dirname, "../draw/index.html"), "utf8");
+  assert.ok(input.includes("gesturestart"));
+  assert.ok(html.includes("user-scalable=no"));
+  assert.ok(html.includes("maximum-scale=1"));
+  assert.ok(drawPage.includes("user-scalable=no"));
+  assert.ok(game.includes("resolution: 1"));
+  assert.ok(!game.includes("lookAhead"));
 });
 
 if (failed) {

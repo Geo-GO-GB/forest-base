@@ -1,27 +1,28 @@
 /* ひみつきちつくろ — 描画と入力。数値は config.js、ルールは sim.js。
-   絵は assets/{キー}.png。ファイルが無いキーは、下の図形のまま。
+   絵は assets/{キー}.png と assets/anim/。ファイルが無いキーは図形のまま。
    一覧は js/sprites.js。おえかきは draw/。
+   歩きの右向きは左向きの反転。木と花の揺れは 0,1,0,2。
 */
 (function (root) {
   "use strict";
 
   const TUTORIAL = {
-    1: "したのスティックか、WASD・やじるしキーで、えだやこいしにちかづこう",
-    2: "ひみつきちのまるいしばふにもどると、しまう",
-    3: "『うる』でコインになる。ひみつきちのうえでできる",
-    4: "『たてる』と『なかま』で、ひみつきちがはたらきだす",
+    1: "画面を触るか、WASD・矢印キーで、枝や小石に近づこう",
+    2: "秘密基地に戻ると、しまう",
+    3: "「売る」でコインになる。秘密基地の上でできる",
+    4: "「建てる」と「仲間」で、秘密基地が動き出す",
   };
 
   const REASON = {
-    "carry-full": "もちきれない。ひみつきちにもどるか、りゅっくをかおう",
-    "storage-full": "ほかんがいっぱい。うるとあきができる",
-    "no-coins": "コインがたりない",
-    "no-materials": "ざいりょうがたりない",
-    locked: "まだみつけていない",
-    owned: "もうもっている",
-    built: "もうたてた",
+    "carry-full": "持ちきれない。秘密基地に戻るか、リュックを買おう",
+    "storage-full": "保管がいっぱい。売ると空きができる",
+    "no-coins": "コインが足りない",
+    "no-materials": "材料が足りない",
+    locked: "まだ見つけていない",
+    owned: "もう持っている",
+    built: "もう建てた",
     empty: "ない",
-    manual: "ボタンでひろう",
+    manual: "ボタンで拾う",
   };
 
   const runtime = {
@@ -49,6 +50,10 @@
     lastStorageToast: 0,
     helperPhase: 0,
     dodge: [],
+    playerBody: null,
+    helperBody: null,
+    colliders: [],
+    packFront: false,
   };
 
   function cfg() {
@@ -83,10 +88,10 @@
     if (!runtime.state) return;
     const result = root.Save.save(runtime.state);
     if (result.ok) {
-      if (explicit) root.UI.toast("ほぞんした");
+      if (explicit) root.UI.toast("保存した");
       runtime.forceUi = true;
     } else if (explicit || result.reason === "failed") {
-      root.UI.toast(result.message || "ほぞんできなかった");
+      root.UI.toast(result.message || "保存できなかった");
     }
   }
 
@@ -103,7 +108,7 @@
 
   function ensureBase() {
     if (runtime.inBase) return true;
-    root.UI.toast("ひみつきちのまるいしばふにもどろう");
+    root.UI.toast("秘密基地に戻ろう");
     return false;
   }
 
@@ -275,7 +280,7 @@
     floatText(node.x, node.y - 16, "+" + cfg().resources[result.type].name);
     reachTutorial(2);
     if (result.discovered) {
-      root.UI.toast("ひかるきのこをみつけた。けんきゅうづくえをたてられる");
+      root.UI.toast("光るキノコを見つけた。研究机を建てられる");
       syncBuildings();
     }
     doSave(false);
@@ -298,7 +303,7 @@
     if (!runtime.state || !ensureBase()) return;
     const deposited = root.Sim.deposit(runtime.state);
     if (deposited.moved) {
-      floatText(runtime.state.player.x, runtime.state.player.y - 28, "しまった");
+      floatText(runtime.state.player.x, runtime.state.player.y - 28, "保管した");
       reachTutorial(3);
     }
     const result = root.Sim.sell(runtime.state, id, all);
@@ -308,7 +313,7 @@
       return;
     }
     reachTutorial(4);
-    root.UI.toast(cfg().resources[id].name + "をうって、" + result.gained + "コイン");
+    root.UI.toast(cfg().resources[id].name + "を売って、" + result.gained + "コイン");
     doSave(false);
   }
 
@@ -322,7 +327,7 @@
       return;
     }
     syncBuildings();
-    root.UI.toast(cfg().buildings[id].name + "をたてた");
+    root.UI.toast(cfg().buildings[id].name + "を建てた");
     doSave(false);
   }
 
@@ -335,7 +340,7 @@
       return;
     }
     if (runtime.helper) runtime.helper.setVisible(true);
-    root.UI.toast("きこりがきた。ひらいているあいだ、えだをあつめる");
+    root.UI.toast("木こりが来た。開いているあいだ、枝を集める");
     doSave(false);
   }
 
@@ -348,7 +353,7 @@
       return;
     }
     if (runtime.pack) runtime.pack.setVisible(true);
-    root.UI.toast("ちいさなりゅっくをかった。もちものがふえた");
+    root.UI.toast("小さなリュックを買った。持ち物が増えた");
     doSave(false);
   }
 
@@ -376,6 +381,79 @@
     return image;
   }
 
+  function placeScaled(scene, key, scale, originY) {
+    if (!key || !scene.textures.exists(key)) return null;
+    const image = scene.add.image(0, 0, key);
+    image.setScale(scale);
+    image.setOrigin(0.5, originY == null ? 1 : originY);
+    return image;
+  }
+
+  function addCircleCollider(x, y, r) {
+    runtime.colliders.push({ t: "circle", x: x, y: y, r: r });
+  }
+
+  function addEllipseCollider(x, y, rx, ry) {
+    runtime.colliders.push({ t: "ellipse", x: x, y: y, rx: rx, ry: ry });
+  }
+
+  function separate(x, y) {
+    const r = cfg().art.bodyRadius;
+    for (let pass = 0; pass < 4; pass += 1) {
+      for (let i = 0; i < runtime.colliders.length; i += 1) {
+        const c = runtime.colliders[i];
+        if (c.t === "circle") {
+          let dx = x - c.x;
+          let dy = y - c.y;
+          const min = r + c.r;
+          const dist = Math.hypot(dx, dy);
+          if (dist < min) {
+            if (dist < 0.001) dy = 1;
+            const scale = (min - dist) / (dist || 1);
+            x += dx * scale;
+            y += dy * scale;
+          }
+        } else {
+          const rx = c.rx + r;
+          const ry = c.ry + r;
+          const nx = (x - c.x) / rx;
+          const ny = (y - c.y) / ry;
+          const d2 = nx * nx + ny * ny;
+          if (d2 < 1) {
+            const d = Math.sqrt(d2);
+            if (d < 0.001) {
+              x = c.x;
+              y = c.y + ry;
+            } else {
+              x = c.x + (nx / d) * rx;
+              y = c.y + (ny / d) * ry;
+            }
+          }
+        }
+      }
+    }
+    return { x: x, y: y };
+  }
+
+  function addGlint(scene, parent, y) {
+    const spark = scene.add.container(12, y);
+    spark.add(scene.add.rectangle(0, 0, 2, 11, 0xfff8d2, 1));
+    spark.add(scene.add.rectangle(0, 0, 11, 2, 0xfff8d2, 1));
+    spark.add(scene.add.circle(0, 0, 1.6, 0xffffff, 0.95));
+    parent.add(spark);
+    scene.tweens.add({
+      targets: spark,
+      alpha: 0.12,
+      scaleX: 0.35,
+      scaleY: 0.35,
+      angle: 18,
+      duration: 720,
+      yoyo: true,
+      repeat: -1,
+      delay: Math.abs(Math.round(parent.x + parent.y)) % 480,
+    });
+  }
+
   function artKeyForNode(type) {
     if (type === "twig" || type === "pebble" || type === "berry" || type === "mushroom") return type;
     return "";
@@ -387,79 +465,166 @@
     return "flower";
   }
 
+  function ellipseMask(scene, name, cx, cy, w, h) {
+    const key = "mask-" + name;
+    const width = Math.max(2, Math.ceil(w));
+    const height = Math.max(2, Math.ceil(h));
+    if (!scene.textures.exists(key)) {
+      const canvas = scene.textures.createCanvas(key, width, height);
+      const ctx = canvas.getContext();
+      ctx.clearRect(0, 0, width, height);
+      ctx.fillStyle = "#ffffff";
+      ctx.beginPath();
+      ctx.ellipse(width / 2, height / 2, width / 2 - 1, height / 2 - 1, 0, 0, Math.PI * 2);
+      ctx.fill();
+      canvas.refresh();
+    }
+    const stamp = scene.add.image(cx, cy, key);
+    stamp.setVisible(false);
+    return stamp.createBitmapMask();
+  }
+
   function drawGround(scene) {
     const world = cfg().world;
-    const g = scene.add.graphics().setDepth(0);
-    g.fillStyle(0x86b36e, 1);
-    g.fillRect(0, 0, world.width, world.height);
-    g.fillStyle(0xd7c09a, 1);
-    g.fillRoundedRect(world.baseX - 26, world.groveY + 20, 52, world.baseY - world.groveY - 10, 18);
-    g.fillStyle(0x6d8f86, 1);
-    g.fillCircle(world.groveX, world.groveY, world.groveRadius);
-    g.fillStyle(0x7a5cff, 0.18);
-    g.fillCircle(world.groveX, world.groveY, world.groveRadius);
-    g.fillStyle(0xc5de9b, 1);
-    g.fillCircle(world.baseX, world.baseY, world.baseRadius);
-    g.lineStyle(4, 0xfff8ee, 0.85);
-    g.strokeCircle(world.baseX, world.baseY, world.baseRadius);
-    g.lineStyle(10, 0x5d8a52, 1);
-    g.strokeRect(6, 6, world.width - 12, world.height - 12);
-    for (let i = 0; i < 10; i += 1) {
-      const angle = (Math.PI * 2 * i) / 10;
-      const x = world.baseX + Math.cos(angle) * world.baseRadius;
-      const y = world.baseY + Math.sin(angle) * world.baseRadius;
-      const stone = placeArt(scene, "stone");
-      if (stone) {
-        stone.setPosition(x, y);
-        stone.setDepth(20);
-      } else {
-        scene.add.ellipse(x, y, 16, 11, 0x9aa098).setStrokeStyle(2, 0x3c2f26).setDepth(20);
+    const art = cfg().art;
+    const tiled = scene.textures.exists("ground_grass");
+    if (tiled) {
+      const grass = scene.add.tileSprite(world.width / 2, world.height / 2, world.width, world.height, "ground_grass");
+      grass.setDepth(0);
+      if (scene.textures.exists("ground_path")) {
+        const pathH = Math.max(8, world.baseY - world.groveY);
+        const path = scene.add.tileSprite(world.baseX, world.groveY + pathH / 2, art.pathWidth, pathH, "ground_path");
+        path.setDepth(1);
+      }
+      if (scene.textures.exists("ground_dark")) {
+        const d = world.groveRadius * 2;
+        const grove = scene.add.tileSprite(world.groveX, world.groveY, d, d, "ground_dark");
+        grove.setMask(ellipseMask(scene, "grove", world.groveX, world.groveY, d, d));
+        grove.setDepth(2);
+      }
+      if (scene.textures.exists("water_edge")) {
+        const pond = art.pond;
+        const water = scene.add.tileSprite(pond.x, pond.y, pond.w, pond.h, "water_edge");
+        water.setMask(ellipseMask(scene, "pond", pond.x, pond.y, pond.w, pond.h));
+        water.setDepth(3);
+        addEllipseCollider(pond.x, pond.y, pond.w / 2, pond.h / 2);
+      }
+      if (scene.textures.exists("base")) {
+        const hut = scene.add.image(world.baseX, world.baseY, "base");
+        hut.setOrigin(0.5, 1);
+        hut.setScale(art.base);
+        hut.setDepth(100 + world.baseY - 1);
+        addEllipseCollider(world.baseX + art.hut.dx, world.baseY + art.hut.dy, art.hut.rx, art.hut.ry);
+      }
+      art.stones.forEach(function (spot) {
+        const stone = placeScaled(scene, "stone", art.stone, 1);
+        if (!stone) return;
+        stone.setPosition(spot.x, spot.y);
+        stone.setDepth(100 + spot.y);
+      });
+    } else {
+      const g = scene.add.graphics().setDepth(0);
+      g.fillStyle(0x86b36e, 1);
+      g.fillRect(0, 0, world.width, world.height);
+      g.fillStyle(0xd7c09a, 1);
+      g.fillRoundedRect(world.baseX - 26, world.groveY + 20, 52, world.baseY - world.groveY - 10, 18);
+      g.fillStyle(0x6d8f86, 1);
+      g.fillCircle(world.groveX, world.groveY, world.groveRadius);
+      g.fillStyle(0x7a5cff, 0.18);
+      g.fillCircle(world.groveX, world.groveY, world.groveRadius);
+      g.fillStyle(0xc5de9b, 1);
+      g.fillCircle(world.baseX, world.baseY, world.baseRadius);
+      g.lineStyle(4, 0xfff8ee, 0.85);
+      g.strokeCircle(world.baseX, world.baseY, world.baseRadius);
+      g.lineStyle(10, 0x5d8a52, 1);
+      g.strokeRect(6, 6, world.width - 12, world.height - 12);
+      for (let i = 0; i < 10; i += 1) {
+        const angle = (Math.PI * 2 * i) / 10;
+        const x = world.baseX + Math.cos(angle) * world.baseRadius;
+        const y = world.baseY + Math.sin(angle) * world.baseRadius;
+        const stone = placeArt(scene, "stone");
+        if (stone) {
+          stone.setPosition(x, y);
+          stone.setDepth(20);
+        } else {
+          scene.add.ellipse(x, y, 16, 11, 0x9aa098).setStrokeStyle(2, 0x3c2f26).setDepth(20);
+        }
       }
     }
-    markDodge(scene.add.text(world.baseX, world.baseY + 78, "ひみつきち", fontStyle(18)).setOrigin(0.5).setDepth(30));
-    markDodge(scene.add.text(world.groveX, world.groveY + 108, "ひかりのはやし", fontStyle(18)).setOrigin(0.5).setDepth(30));
-    markDodge(scene.add.text(world.groveX, world.groveY + 132, "ボタンでひろう", fontStyle(14)).setOrigin(0.5).setDepth(30));
-    markDodge(scene.add.text(world.baseX + 36, (world.baseY + world.groveY) / 2, "きたへ", fontStyle(16)).setOrigin(0.5).setDepth(30));
+    const labelDepth = function (y) {
+      return 100 + y;
+    };
+    markDodge(scene.add.text(world.baseX, world.baseY + 320, "秘密基地", fontStyle(18)).setOrigin(0.5).setDepth(labelDepth(world.baseY + 320)));
+    markDodge(scene.add.text(world.groveX, world.groveY + 108, "光る林", fontStyle(18)).setOrigin(0.5).setDepth(labelDepth(world.groveY + 108)));
+    markDodge(scene.add.text(world.groveX, world.groveY + 132, "ボタンで拾う", fontStyle(14)).setOrigin(0.5).setDepth(labelDepth(world.groveY + 132)));
+    markDodge(scene.add.text(world.baseX + 118, (world.baseY + world.groveY) / 2, "北へ", fontStyle(16)).setOrigin(0.5).setDepth(labelDepth((world.baseY + world.groveY) / 2)));
+  }
+
+  function playSway(scene, key, x, y, scale) {
+    const sheet = key + "-sway";
+    if (scene.textures.exists(sheet) && scene.anims.exists(sheet)) {
+      const sprite = scene.add.sprite(x, y, sheet);
+      sprite.setOrigin(0.5, 1);
+      sprite.setScale(scale);
+      sprite.play(sheet);
+      sprite.setDepth(100 + y);
+      return sprite;
+    }
+    if (scene.textures.exists(key)) {
+      const image = scene.add.image(x, y, key);
+      image.setOrigin(0.5, 1);
+      image.setScale(scale);
+      image.setDepth(100 + y);
+      return image;
+    }
+    return null;
   }
 
   function drawTree(scene, tree) {
-    const c = scene.add.container(tree.x, tree.y);
     const key = tree.shade > 0.5 ? "tree-dark" : "tree";
-    const spec = root.SPRITE_BY_KEY[key];
-    const art = spec ? placeArt(scene, key, spec.displayW * tree.scale, spec.displayH * tree.scale) : null;
+    const art = playSway(scene, key, tree.x, tree.y, cfg().art.trees);
     if (art) {
-      art.setPosition(0, 4);
-      c.add(art);
-    } else {
-      const h = 34 * tree.scale;
-      c.add(scene.add.rectangle(0, 8, 8, 18, 0x6b4630));
-      c.add(scene.add.circle(0, -h * 0.25, 16 * tree.scale, tree.shade > 0.5 ? 0x3f7d4e : 0x4e8d55));
-      c.add(scene.add.circle(-8 * tree.scale, -h * 0.05, 11 * tree.scale, 0x356b43));
+      addCircleCollider(tree.x, tree.y, cfg().art.trunkRadius);
+      return;
     }
+    const c = scene.add.container(tree.x, tree.y);
+    const h = 34 * tree.scale;
+    c.add(scene.add.rectangle(0, 8, 8, 18, 0x6b4630));
+    c.add(scene.add.circle(0, -h * 0.25, 16 * tree.scale, tree.shade > 0.5 ? 0x3f7d4e : 0x4e8d55));
+    c.add(scene.add.circle(-8 * tree.scale, -h * 0.05, 11 * tree.scale, 0x356b43));
     c.setDepth(100 + tree.y);
   }
 
   function drawFlower(scene, flower) {
-    const art = placeArt(scene, flowerKey(flower.color));
-    if (art) {
-      art.setPosition(flower.x, flower.y);
-      art.setDepth(12);
-      return;
-    }
-    scene.add.circle(flower.x, flower.y, 3.5, flower.color).setDepth(12);
+    const key = flowerKey(flower.color);
+    const art = playSway(scene, key, flower.x, flower.y, cfg().art.flowers);
+    if (art) return;
+    scene.add.circle(flower.x, flower.y, 3.5, flower.color).setDepth(100 + flower.y);
   }
 
   function drawNode(scene, node) {
     const resource = cfg().resources[node.type];
     const c = scene.add.container(node.x, node.y);
-    const art = placeArt(scene, artKeyForNode(node.type));
+    const key = artKeyForNode(node.type);
+    const scale = cfg().art.pickups[node.type];
+    const art = key && scale ? placeScaled(scene, key, scale, 1) : null;
     if (art) {
       c.add(art);
+      const spec = root.SPRITE_BY_KEY[key];
+      const top = spec ? -(spec.height * scale) : -28;
+      addGlint(scene, c, top + 10);
       if (node.type === "mushroom") {
-        const glow = scene.add.circle(0, -6, 22, 0xc9b6ff, 0.35);
+        const glow = scene.add.circle(0, top * 0.55, 18, 0xc9b6ff, 0.42);
         c.addAt(glow, 0);
-        c.add(markDodge(scene.add.text(0, -30, "とくべつ", fontStyle(13)).setOrigin(0.5)));
-        scene.tweens.add({ targets: glow, alpha: 0.1, yoyo: true, repeat: -1, duration: 700 });
+        c.add(markDodge(scene.add.text(0, top - 8, "特別", fontStyle(13)).setOrigin(0.5)));
+        scene.tweens.add({
+          targets: glow,
+          alpha: 0.12,
+          scale: 1.45,
+          yoyo: true,
+          repeat: -1,
+          duration: 760,
+        });
       }
       c.setDepth(100 + node.y);
       return c;
@@ -479,7 +644,7 @@
       c.add(scene.add.rectangle(0, 6, 6, 12, 0xf2e2c4).setStrokeStyle(2, 0x3c2f26));
       c.add(scene.add.ellipse(0, -1, 22, 12, resource.color).setStrokeStyle(2, 0x3c2f26));
       c.add(scene.add.circle(-4, -2, 2, 0xfff4a8));
-      c.add(markDodge(scene.add.text(0, -26, "とくべつ", fontStyle(13)).setOrigin(0.5)));
+      c.add(markDodge(scene.add.text(0, -26, "特別", fontStyle(13)).setOrigin(0.5)));
       scene.tweens.add({ targets: glow, alpha: 0.12, yoyo: true, repeat: -1, duration: 700 });
     }
     c.setDepth(100 + node.y);
@@ -488,9 +653,8 @@
 
   function drawBuildingArt(scene, id, parent) {
     if (id === "box" || id === "workbench" || id === "desk") {
-      const art = placeArt(scene, id);
+      const art = placeScaled(scene, id, cfg().art.furniture, 1);
       if (art) {
-        art.setPosition(0, 12);
         parent.add(art);
         return;
       }
@@ -512,10 +676,9 @@
     cfg().buildingOrder.forEach(function (id) {
       const pos = cfg().slots[id];
       const rootC = scene.add.container(pos.x, pos.y);
-      const markerArt = placeArt(scene, "marker");
+      const markerArt = placeScaled(scene, "marker", cfg().art.furniture, 1);
       let marker;
       if (markerArt) {
-        markerArt.setPosition(0, 8);
         marker = markerArt;
       } else {
         marker = scene.add.rectangle(0, 4, 36, 24, 0xe7d7bc, 0.95).setStrokeStyle(2, 0x8a7560);
@@ -523,31 +686,91 @@
       const built = scene.add.container(0, 0);
       drawBuildingArt(scene, id, built);
       built.setVisible(false);
-      const label = markDodge(scene.add.text(0, -30, cfg().buildings[id].name, fontStyle(14)).setOrigin(0.5));
+      const spec = root.SPRITE_BY_KEY[id];
+      const labelY = spec && scene.textures.exists(id) ? -(spec.height * cfg().art.furniture + 8) : -30;
+      const label = markDodge(scene.add.text(0, labelY, cfg().buildings[id].name, fontStyle(14)).setOrigin(0.5));
+      addCircleCollider(pos.x, pos.y, id === "workbench" ? 22 : 16);
       rootC.add([marker, built, label]);
       rootC.setDepth(100 + pos.y);
       runtime.slots[id] = { root: rootC, marker: marker, built: built, label: label };
     });
     const shop = cfg().slots.shop;
     const sign = scene.add.container(shop.x, shop.y);
-    const shopArt = placeArt(scene, "shop");
+    const shopArt = placeScaled(scene, "shop", cfg().art.furniture, 1);
     if (shopArt) {
-      shopArt.setPosition(0, 10);
       sign.add(shopArt);
     } else {
       sign.add(scene.add.rectangle(0, 12, 6, 28, 0x8a5a32));
       sign.add(scene.add.rectangle(0, -6, 58, 28, 0xfff8ee).setStrokeStyle(3, 0x3c2f26));
-      sign.add(markDodge(scene.add.text(0, -6, "おみせ", fontStyle(14)).setOrigin(0.5)));
+      sign.add(markDodge(scene.add.text(0, -6, "お店", fontStyle(14)).setOrigin(0.5)));
     }
     sign.setDepth(100 + shop.y);
+    addCircleCollider(shop.x, shop.y, 24);
+  }
+
+  function makeActor(scene, sheetIdle, stillKey) {
+    const art = cfg().art;
+    if (scene.textures.exists(sheetIdle)) {
+      const sprite = scene.add.sprite(0, 0, sheetIdle);
+      sprite.setOrigin(0.5, art.feetY / art.frame);
+      sprite.setScale(art.characters);
+      if (scene.anims.exists(sheetIdle)) sprite.play(sheetIdle);
+      return sprite;
+    }
+    if (stillKey && scene.textures.exists(stillKey)) {
+      const image = scene.add.image(0, 0, stillKey);
+      image.setOrigin(0.5, 1);
+      image.setScale(art.characters);
+      return image;
+    }
+    return null;
+  }
+
+  function applyFacing(sprite, pack, vx, vy, who) {
+    if (!sprite || !sprite.anims) return;
+    const moving = Math.hypot(vx, vy) > 0.04;
+    let anim = who + "-idle";
+    let flip = false;
+    let packX = 0;
+    let packY = -34;
+    let packFront = false;
+    if (moving && Math.abs(vx) > Math.abs(vy)) {
+      anim = who + "-walk-left";
+      flip = vx > 0;
+      packX = flip ? -10 : 10;
+      packY = -30;
+    } else if (moving && vy < 0) {
+      anim = who + "-walk-up";
+      packY = -18;
+      packFront = true;
+    } else if (moving) {
+      anim = who + "-walk-down";
+      packY = -34;
+    }
+    if (sprite.scene && sprite.scene.anims.exists(anim)) {
+      const current = sprite.anims.currentAnim;
+      if (!current || current.key !== anim) sprite.play(anim);
+    }
+    if (sprite.flipX !== flip) sprite.setFlipX(flip);
+    if (!pack) return;
+    pack.setPosition(packX, packY);
+    pack.setFlipX(flip);
+    const parent = sprite.parentContainer;
+    if (!parent) return;
+    if (packFront !== runtime.packFront) {
+      runtime.packFront = packFront;
+      if (packFront) parent.bringToTop(pack);
+      else parent.bringToTop(sprite);
+    }
   }
 
   function drawPlayer(scene, x, y) {
+    const art = cfg().art;
     const c = scene.add.container(x, y);
-    c.add(scene.add.ellipse(0, 20, 34, 12, 0x000000, 0.18));
-    const body = placeArt(scene, "player");
+    c.add(scene.add.ellipse(0, 1, art.shadowW, art.shadowH, 0x1a2418, 0.28));
+    const body = makeActor(scene, "player-idle", "player");
     if (body) {
-      body.setPosition(0, 18);
+      runtime.playerBody = body;
       c.add(body);
     } else {
       c.add(scene.add.ellipse(0, 8, 26, 30, 0x3f7d4e).setStrokeStyle(2, 0x3c2f26));
@@ -556,31 +779,34 @@
       c.add(scene.add.circle(-4, -14, 1.6, 0x2c241c));
       c.add(scene.add.circle(4, -14, 1.6, 0x2c241c));
     }
-    const packArt = placeArt(scene, "backpack");
+    const packArt = placeScaled(scene, "backpack", art.pickups.backpack, 1);
     if (packArt) {
-      packArt.setPosition(-20, 6);
+      packArt.setPosition(0, -34);
       runtime.pack = packArt;
     } else {
       runtime.pack = scene.add.rectangle(-14, 6, 12, 16, 0x8a5a32).setStrokeStyle(2, 0x3c2f26);
     }
     runtime.pack.setVisible(runtime.state.backpack);
-    c.add(runtime.pack);
-    const ring = scene.add.graphics();
-    ring.lineStyle(2, 0xfffaf3, 0.28);
-    ring.strokeCircle(0, 0, cfg().autoCollectRadius);
-    c.add(ring);
-    c.setDepth(100 + y);
+    c.addAt(runtime.pack, 1);
+    if (!body) {
+      const ring = scene.add.graphics();
+      ring.lineStyle(2, 0xfffaf3, 0.28);
+      ring.strokeCircle(0, 0, cfg().autoCollectRadius);
+      c.add(ring);
+    }
+    c.setDepth(100 + y + 1);
     return c;
   }
 
   function drawHelper(scene) {
+    const art = cfg().art;
     const path = cfg().helperPath;
     const c = scene.add.container(path.x1, path.y1);
-    c.add(scene.add.ellipse(0, 18, 26, 10, 0x000000, 0.18));
-    const art = placeArt(scene, "helper");
-    if (art) {
-      art.setPosition(0, 16);
-      c.add(art);
+    c.add(scene.add.ellipse(0, 1, art.shadowW, art.shadowH, 0x1a2418, 0.28));
+    const body = makeActor(scene, "helper-idle", "helper");
+    if (body) {
+      runtime.helperBody = body;
+      c.add(body);
     } else {
       c.add(scene.add.ellipse(0, 6, 22, 26, 0x8a5a32).setStrokeStyle(2, 0x3c2f26));
       c.add(scene.add.circle(0, -12, 10, 0xf3c7a5).setStrokeStyle(2, 0x3c2f26));
@@ -588,7 +814,7 @@
       c.add(scene.add.circle(-3.5, -12, 1.3, 0x2c241c));
       c.add(scene.add.circle(3.5, -12, 1.3, 0x2c241c));
     }
-    runtime.helperBubble = markDodge(scene.add.text(0, -36, "", fontStyle(13)).setOrigin(0.5));
+    runtime.helperBubble = markDodge(scene.add.text(0, -74, "", fontStyle(13)).setOrigin(0.5));
     c.add(runtime.helperBubble);
     c.setVisible(runtime.state.helperHired);
     c.setDepth(100 + path.y1);
@@ -602,18 +828,48 @@
     return camera.desktop;
   }
 
+  function cssSize(scene) {
+    const canvas = scene.game && scene.game.canvas;
+    const parent = canvas && canvas.parentElement;
+    return {
+      w: (parent && parent.clientWidth) || window.innerWidth,
+      h: (parent && parent.clientHeight) || window.innerHeight,
+    };
+  }
+
+  function ensureCanvas(scene) {
+    const css = cssSize(scene);
+    const w = Math.max(1, Math.round(css.w));
+    const h = Math.max(1, Math.round(css.h));
+    const canvas = scene.game.canvas;
+    if (canvas && (Math.abs(canvas.width - w) > 1 || Math.abs(canvas.height - h) > 1)) {
+      /* DPR が高いと Scale の自動追従が親サイズを取りこぼすことがある。 */
+      scene.scale.setParentSize(w, h);
+    }
+    return { w: w, h: h };
+  }
+
   function updateCamera(scene) {
     const cam = scene.cameras.main;
-    const zoom = zoomFor(scene.scale.width);
+    const css = ensureCanvas(scene);
+    const desired = zoomFor(css.w);
+    const bufferW = cam.width || css.w;
+    const bufferH = cam.height || css.h;
+    const ratio = bufferW / css.w;
+    const dpr = window.devicePixelRatio || 1;
+    /* バッファが devicePixelRatio 倍のときだけ、CSS ピクセル基準の見え方に戻す。 */
+    const zoom = dpr > 1.25 && Math.abs(ratio - dpr) < 0.2 ? desired * ratio : desired;
     cam.setZoom(zoom);
     const world = cfg().world;
-    const viewW = cam.width / zoom;
-    const viewH = cam.height / zoom;
+    const viewW = bufferW / zoom;
+    const viewH = bufferH / zoom;
     const player = runtime.state.player;
-    const maxX = Math.max(0, world.width - viewW);
-    const maxY = Math.max(0, world.height - viewH);
-    const scrollX = Math.max(0, Math.min(maxX, player.x - viewW / 2));
-    const scrollY = Math.max(0, Math.min(maxY, player.y - viewH / 2 - cfg().camera.lookAhead));
+    let scrollX = player.x - viewW / 2;
+    let scrollY = player.y - viewH / 2;
+    if (viewW >= world.width) scrollX = (world.width - viewW) / 2;
+    else scrollX = Math.max(0, Math.min(world.width - viewW, scrollX));
+    if (viewH >= world.height) scrollY = (world.height - viewH) / 2;
+    else scrollY = Math.max(0, Math.min(world.height - viewH, scrollY));
     cam.setScroll(scrollX, scrollY);
   }
 
@@ -622,11 +878,65 @@
     sprites.forEach(function (sprite) {
       scene.load.image(sprite.key, "assets/" + sprite.file);
     });
+    scene.load.image("base", "assets/base.png");
+    scene.load.image("ground_grass", "assets/ground_grass.png");
+    scene.load.image("ground_path", "assets/ground_path.png");
+    scene.load.image("ground_dark", "assets/ground_dark.png");
+    scene.load.image("water_edge", "assets/water_edge.png");
+    const sheets = [
+      ["player-walk-down", "assets/anim/player_walk_down.png", 128, 128],
+      ["player-walk-up", "assets/anim/player_walk_up.png", 128, 128],
+      ["player-walk-left", "assets/anim/player_walk_left.png", 128, 128],
+      ["player-idle", "assets/anim/player_idle.png", 128, 128],
+      ["helper-walk-down", "assets/anim/helper_walk_down.png", 128, 128],
+      ["helper-walk-up", "assets/anim/helper_walk_up.png", 128, 128],
+      ["helper-walk-left", "assets/anim/helper_walk_left.png", 128, 128],
+      ["helper-idle", "assets/anim/helper_idle.png", 128, 128],
+      ["tree-sway", "assets/anim/tree_sway.png", 96, 128],
+      ["tree-dark-sway", "assets/anim/tree-dark_sway.png", 96, 128],
+      ["flower-sway", "assets/anim/flower_sway.png", 64, 64],
+      ["flower-pink-sway", "assets/anim/flower-pink_sway.png", 64, 64],
+      ["flower-white-sway", "assets/anim/flower-white_sway.png", 64, 64],
+    ];
+    sheets.forEach(function (row) {
+      scene.load.spritesheet(row[0], row[1], { frameWidth: row[2], frameHeight: row[3] });
+    });
+  }
+
+  function defineAnims(scene) {
+    const art = cfg().art;
+    function add(key, frames, rate) {
+      if (!scene.textures.exists(key) || scene.anims.exists(key)) return;
+      scene.anims.create({ key: key, frames: frames, frameRate: rate, repeat: -1 });
+    }
+    ["player", "helper"].forEach(function (who) {
+      ["down", "up", "left"].forEach(function (dir) {
+        const sheet = who + "-walk-" + dir;
+        if (!scene.textures.exists(sheet)) return;
+        add(sheet, scene.anims.generateFrameNumbers(sheet, { start: 0, end: 3 }), art.walkFps);
+      });
+      const idle = who + "-idle";
+      if (!scene.textures.exists(idle)) return;
+      add(idle, scene.anims.generateFrameNumbers(idle, { start: 0, end: 1 }), art.idleFps);
+    });
+    ["tree", "tree-dark", "flower", "flower-pink", "flower-white"].forEach(function (key) {
+      const sheet = key + "-sway";
+      if (!scene.textures.exists(sheet)) return;
+      add(sheet, [
+        { key: sheet, frame: 0 },
+        { key: sheet, frame: 1 },
+        { key: sheet, frame: 0 },
+        { key: sheet, frame: 2 },
+      ], art.swayFps);
+    });
   }
 
   function sceneCreate(scene) {
     runtime.scene = scene;
-    const world = cfg().world;
+    runtime.colliders = [];
+    runtime.playerBody = null;
+    runtime.helperBody = null;
+    defineAnims(scene);
     const state = runtime.state;
     drawGround(scene);
     const decor = root.Layout.generateDecor(cfg());
@@ -645,7 +955,7 @@
     runtime.player = drawPlayer(scene, state.player.x, state.player.y);
     runtime.helper = drawHelper(scene);
     const cam = scene.cameras.main;
-    cam.setBounds(0, 0, world.width, world.height);
+    cam.useBounds = false;
     updateCamera(scene);
     scene.scale.on("resize", function () {
       updateCamera(scene);
@@ -661,12 +971,19 @@
     const v = root.Input.vector();
     const dt = step / 1000;
     const world = cfg().world;
-    state.player.x += v.x * cfg().playerSpeed * dt;
-    state.player.y += v.y * cfg().playerSpeed * dt;
-    state.player.x = Math.max(world.pad, Math.min(world.width - world.pad, state.player.x));
-    state.player.y = Math.max(world.pad, Math.min(world.height - world.pad, state.player.y));
-    runtime.player.setPosition(state.player.x, state.player.y);
-    runtime.player.setDepth(100 + state.player.y);
+    let x = state.player.x + v.x * cfg().playerSpeed * dt;
+    let y = state.player.y + v.y * cfg().playerSpeed * dt;
+    const moved = separate(x, y);
+    x = Math.max(world.pad, Math.min(world.width - world.pad, moved.x));
+    y = Math.max(world.pad, Math.min(world.height - world.pad, moved.y));
+    const again = separate(x, y);
+    x = Math.max(world.pad, Math.min(world.width - world.pad, again.x));
+    y = Math.max(world.pad, Math.min(world.height - world.pad, again.y));
+    state.player.x = x;
+    state.player.y = y;
+    runtime.player.setPosition(x, y);
+    runtime.player.setDepth(100 + y + 1);
+    applyFacing(runtime.playerBody, runtime.pack, v.x, v.y, "player");
   }
 
   function nearestMushroom() {
@@ -708,7 +1025,7 @@
     if (!runtime.inBase || root.Sim.bagCount(state.carry) <= 0) return;
     const result = root.Sim.deposit(state);
     if (result.moved) {
-      floatText(state.player.x, state.player.y - 28, "しまった");
+      floatText(state.player.x, state.player.y - 28, "保管した");
       reachTutorial(3);
       doSave(false);
     }
@@ -718,13 +1035,13 @@
   function announce(prev, next) {
     if (!prev) return;
     if (next.helper === "full" && prev.helper !== "full") {
-      root.UI.toast("きこり: ほかんがいっぱい。うるか、きばこをたてるとまたうごく");
+      root.UI.toast("木こり: 保管がいっぱい。売るか、木箱を建てるとまた動く");
     }
     if (next.workbench === "no-input" && prev.workbench !== "no-input") {
-      root.UI.toast("さぎょうだい: えだがたりない。ひろうか、きこりをやとうとすすむ");
+      root.UI.toast("作業台: 枝が足りない。拾うか、木こりを雇うと進む");
     }
     if (next.workbench === "full" && prev.workbench !== "full") {
-      root.UI.toast("さぎょうだい: ほかんがいっぱい");
+      root.UI.toast("作業台: 保管がいっぱい");
     }
   }
 
@@ -760,12 +1077,18 @@
     const working = runtime.statuses.helper === "run";
     if (working) runtime.helperPhase += step;
     const t = (Math.sin(runtime.helperPhase / 420) + 1) / 2;
+    const prevX = runtime.helper.x;
+    const prevY = runtime.helper.y;
     const x = working ? path.x1 + (path.x2 - path.x1) * t : path.x1;
     const y = working ? path.y1 + (path.y2 - path.y1) * t : path.y1;
     runtime.helper.setPosition(x, y);
     runtime.helper.setDepth(100 + y);
+    applyFacing(runtime.helperBody, null, x - prevX, y - prevY, "helper");
+    if (runtime.helperBubble && runtime.helperBubble.parentContainer) {
+      runtime.helperBubble.parentContainer.bringToTop(runtime.helperBubble);
+    }
     const code = runtime.statuses.helper;
-    runtime.helperBubble.setText(code === "full" ? "いっぱい" : code === "run" ? cfg().helper.name : "");
+    runtime.helperBubble.setText(code === "full" ? "満杯" : code === "run" ? cfg().helper.name : "");
   }
 
   function sceneUpdate(scene, time, delta) {
@@ -798,7 +1121,7 @@
   function startGame(state) {
     if (runtime.started) return;
     if (!root.Phaser) {
-      root.UI.showFatal("ゲーム画面をよみこめなかった");
+      root.UI.showFatal("ゲーム画面を読み込めなかった");
       return;
     }
     runtime.started = true;
@@ -812,11 +1135,13 @@
       backgroundColor: "#86b36e",
       banner: false,
       audio: { noAudio: true },
+      resolution: 1,
       scale: {
         mode: root.Phaser.Scale.RESIZE,
         autoCenter: root.Phaser.Scale.CENTER_BOTH,
         width: window.innerWidth,
         height: window.innerHeight,
+        zoom: 1,
       },
       input: { activePointers: 2 },
       scene: {
@@ -920,10 +1245,27 @@
           offsetY: cam.followOffset.y,
         };
       },
+      getMotion: function () {
+        const body = runtime.playerBody;
+        const anim = body && body.anims && body.anims.currentAnim;
+        const scene = runtime.scene;
+        return {
+          anim: anim ? anim.key : "",
+          flip: !!(body && body.flipX),
+          frame: body && body.frame ? String(body.frame.name) : "",
+          grass: !!(scene && scene.textures.exists("ground_grass")),
+          path: !!(scene && scene.textures.exists("ground_path")),
+          dark: !!(scene && scene.textures.exists("ground_dark")),
+          water: !!(scene && scene.textures.exists("water_edge")),
+          base: !!(scene && scene.textures.exists("base")),
+          walk: !!(scene && scene.textures.exists("player-walk-left")),
+          sway: !!(scene && scene.anims.exists("tree-sway")),
+        };
+      },
       ready: false,
     };
     if (!root.Phaser) {
-      root.UI.showFatal("ゲーム画面をよみこめなかった");
+      root.UI.showFatal("ゲーム画面を読み込めなかった");
       return;
     }
     if (params.get("play") === "1") startGame(loaded.state);

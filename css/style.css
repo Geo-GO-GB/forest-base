@@ -4,6 +4,7 @@
   --moss: #3f7d4e;
   --line: #3c2f26;
   --gold: #f0c36a;
+  --dock-h: 24px;
   color-scheme: light;
 }
 
@@ -19,6 +20,8 @@ html, body {
   touch-action: none;
   user-select: none;
   -webkit-user-select: none;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
   overscroll-behavior: none;
 }
 
@@ -50,7 +53,12 @@ button.danger { background: #f6d6cf; }
   touch-action: none;
 }
 
-#game-root canvas { display: block; }
+#game-root canvas {
+  display: block;
+  touch-action: none;
+}
+
+button, a { touch-action: none; }
 
 #title-screen {
   position: fixed;
@@ -202,18 +210,21 @@ body.playing .side-buttons { display: flex; }
 #stick {
   display: none;
   position: fixed;
-  left: max(16px, env(safe-area-inset-left));
-  bottom: max(16px, env(safe-area-inset-bottom));
-  width: 120px;
-  height: 120px;
+  left: 0;
+  top: 0;
+  width: 112px;
+  height: 112px;
+  margin: 0;
   border-radius: 50%;
-  background: rgba(255, 248, 238, 0.78);
-  border: 3px solid var(--line);
+  background: rgba(255, 248, 238, 0.38);
+  border: 2px solid rgba(60, 47, 38, 0.35);
   z-index: 20;
   touch-action: none;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
 }
 
-body.playing #stick { display: block; }
+body.playing #stick.active { display: block; }
 
 body.panel-open #stick,
 body.panel-open #action-btn { visibility: hidden; }
@@ -222,11 +233,11 @@ body.panel-open #action-btn { visibility: hidden; }
   position: absolute;
   left: 50%;
   top: 50%;
-  width: 52px;
-  height: 52px;
+  width: 46px;
+  height: 46px;
   border-radius: 50%;
-  background: var(--moss);
-  border: 3px solid var(--line);
+  background: rgba(63, 125, 78, 0.7);
+  border: 2px solid rgba(60, 47, 38, 0.45);
   transform: translate(-50%, -50%);
   pointer-events: none;
 }
@@ -235,7 +246,7 @@ body.panel-open #action-btn { visibility: hidden; }
   position: fixed;
   left: 50%;
   transform: translateX(-50%);
-  bottom: calc(max(16px, env(safe-area-inset-bottom)) + 132px);
+  bottom: max(16px, env(safe-area-inset-bottom));
   z-index: 22;
   min-height: 56px;
   min-width: min(240px, calc(100vw - 36px));
@@ -389,8 +400,10 @@ body.panel-open #action-btn { visibility: hidden; }
 @media (max-width: 360px) {
   .logo { font-size: 16px; }
   .side-buttons button { min-width: 76px; padding: 8px; }
-  #stick { width: 108px; height: 108px; }
+  #stick { width: 100px; height: 100px; }
 }
+
+body:has(#action-btn:not([hidden])) { --dock-h: 88px; }
 
 @media (max-height: 520px) {
   :root { --dock-h: 64px; }
@@ -427,7 +440,7 @@ body.panel-open #action-btn { visibility: hidden; }
   .side-buttons {
     top: auto;
     bottom: max(8px, env(safe-area-inset-bottom));
-    left: calc(max(8px, env(safe-area-inset-left)) + 104px);
+    left: max(8px, env(safe-area-inset-left));
     right: max(8px, env(safe-area-inset-right));
     flex-direction: row;
     flex-wrap: nowrap;
@@ -441,7 +454,7 @@ body.panel-open #action-btn { visibility: hidden; }
     font-size: 14px;
   }
   #action-btn {
-    left: calc(max(8px, env(safe-area-inset-left)) + 104px);
+    left: max(8px, env(safe-area-inset-left));
     right: max(8px, env(safe-area-inset-right));
     transform: none;
     bottom: calc(max(8px, env(safe-area-inset-bottom)) + 56px);
@@ -454,8 +467,6 @@ body.panel-open #action-btn { visibility: hidden; }
   #stick {
     width: 96px;
     height: 96px;
-    left: max(8px, env(safe-area-inset-left));
-    bottom: max(8px, env(safe-area-inset-bottom));
   }
   #toasts {
     display: flex;
