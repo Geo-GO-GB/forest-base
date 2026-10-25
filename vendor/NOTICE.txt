@@ -1,0 +1,9 @@
+Phaser 3.85.2 (dist/phaser.min.js)
+Copyright (c) Richard Davey
+Licensed under the MIT License.
+https://www.opensource.org/licenses/mit-license.php
+https://github.com/phaserjs/phaser
+https://www.npmjs.com/package/phaser/v/3.85.2
+
+This file is the pinned 3.85.2 browser build, vendored so the game does not
+fetch Phaser from a CDN at runtime.
