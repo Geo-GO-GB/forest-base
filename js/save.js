@@ -47,7 +47,7 @@
       carry: emptyBag(),
       storage: emptyBag(),
       backpack: false,
-      buildings: { box: false, workbench: false, desk: false },
+      buildings: { workbench: false, desk: false },
       helperHired: false,
       discoveredMushroom: false,
       nodes: defaultNodes(),
@@ -93,9 +93,14 @@
       state.display[i] = cfg().products[id] ? id : "";
     }
     state.backpack = raw.backpack === true;
-    state.buildings.box = !!(raw.buildings && raw.buildings.box);
     state.buildings.workbench = !!(raw.buildings && raw.buildings.workbench);
     state.buildings.desk = !!(raw.buildings && raw.buildings.desk);
+    if (raw.buildings && raw.buildings.box === true) {
+      /* 木箱は無くした。建てていた保存には、当時の代金（コイン4、枝3、小石2）を一度返す。 */
+      state.coins = clampInt(state.coins + 4, 0, BIG);
+      state.storage.twig = clampInt(state.storage.twig + 3, 0, BIG);
+      state.storage.pebble = clampInt(state.storage.pebble + 2, 0, BIG);
+    }
     state.crew = root.Sim.emptyCrew();
     const savedCrew = raw.crew || {};
     const crewOrder = cfg().crewOrder;

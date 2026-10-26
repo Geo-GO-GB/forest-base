@@ -274,7 +274,7 @@
   }
 
   function remedy(code) {
-    if (code === "full") return "売って減らすか、木箱を建てるとまた動く";
+    if (code === "full") return "売って減らすとまた動く";
     if (code === "no-input") return "枝を拾うか、枝拾いおじさんを雇うと進む";
     if (code === "run") return "開いているあいだだけ進む";
     return "";

@@ -13,7 +13,6 @@
     { key: "berry", name: "木の実", file: "berry.png", width: 64, height: 64, displayW: 28, displayH: 28, anchorY: 0.5 },
     { key: "plank", name: "木材", file: "plank.png", width: 128, height: 64, displayW: 36, displayH: 18, anchorY: 0.5 },
     { key: "mushroom", name: "光るキノコ", file: "mushroom.png", width: 64, height: 96, displayW: 32, displayH: 40, anchorY: 0.8 },
-    { key: "box", name: "木箱", file: "box.png", width: 96, height: 80, displayW: 48, displayH: 40, anchorY: 0.75 },
     { key: "workbench", name: "作業台", file: "workbench.png", width: 112, height: 80, displayW: 56, displayH: 40, anchorY: 0.75 },
     { key: "desk", name: "研究机", file: "desk.png", width: 96, height: 80, displayW: 48, displayH: 40, anchorY: 0.75 },
     { key: "shop", name: "お店", file: "shop.png", width: 128, height: 96, displayW: 64, displayH: 52, anchorY: 0.8 },

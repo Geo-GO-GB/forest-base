@@ -142,7 +142,8 @@ test("deposit, sell, backpack, build, and hire", function () {
   assert.equal(Sim.buyBackpack(state).ok, true);
   assert.equal(state.backpack, true);
   assert.equal(Sim.buyBackpack(state).reason, "owned");
-  assert.equal(Sim.build(state, "box").ok, true);
+  assert.equal(Sim.build(state, "workbench").ok, true);
+  assert.equal(state.buildings.workbench, true);
   assert.equal(Sim.build(state, "desk").reason, "locked");
   state.discoveredMushroom = true;
   state.carry.mushroom = 1;
@@ -290,6 +291,34 @@ test("save roundtrip keeps progress and ignores an old timestamp", function () {
   assert.notEqual(loaded.state.savedAt, 0);
 });
 
+test("an old wooden box save refunds its cost and still loads", function () {
+  const ls = memoryStorage();
+  globalThis.localStorage = ls;
+  ls.setItem(CFG.saveKey, JSON.stringify({
+    version: 1,
+    coins: 3,
+    buildings: { box: true, workbench: true, desk: false },
+    storage: { twig: 1, pebble: 4 },
+    helperHired: true,
+  }));
+  const loaded = Save.load();
+  assert.equal(loaded.warning, "");
+  assert.equal(loaded.locked, false);
+  assert.equal(loaded.state.coins, 7);
+  assert.equal(loaded.state.storage.twig, 4);
+  assert.equal(loaded.state.storage.pebble, 6);
+  assert.equal(loaded.state.buildings.box, undefined);
+  assert.equal(loaded.state.buildings.workbench, true);
+  assert.equal(loaded.state.buildings.desk, false);
+  assert.equal(loaded.state.helperHired, true);
+  assert.equal(Sim.build(loaded.state, "box").reason, "missing");
+  assert.equal(Save.save(loaded.state).ok, true);
+  const again = Save.load();
+  assert.equal(again.state.coins, 7);
+  assert.equal(again.state.storage.twig, 4);
+  assert.equal(again.state.storage.pebble, 6);
+});
+
 test("corrupt saves are quarantined and a newer version is not overwritten", function () {
   const ls = memoryStorage();
   globalThis.localStorage = ls;
@@ -312,7 +341,7 @@ test("corrupt saves are quarantined and a newer version is not overwritten", fun
 test("sprite list is one entry per placeholder the game can swap", function () {
   const list = globalThis.SPRITE_LIST;
   const by = globalThis.SPRITE_BY_KEY;
-  assert.equal(list.length, 19);
+  assert.equal(list.length, 18);
   const seen = {};
   list.forEach(function (sprite) {
     assert.ok(!seen[sprite.key], "duplicate " + sprite.key);
@@ -326,7 +355,7 @@ test("sprite list is one entry per placeholder the game can swap", function () {
   });
   const game = fs.readFileSync(path.join(__dirname, "../js/game.js"), "utf8");
   const ui = fs.readFileSync(path.join(__dirname, "../js/ui.js"), "utf8");
-  ["player", "backpack", "helper", "twig", "pebble", "berry", "mushroom", "box", "workbench", "desk", "shop", "marker", "tree", "tree-dark", "flower", "flower-pink", "flower-white", "stone"].forEach(function (key) {
+  ["player", "backpack", "helper", "twig", "pebble", "berry", "mushroom", "workbench", "desk", "shop", "marker", "tree", "tree-dark", "flower", "flower-pink", "flower-white", "stone"].forEach(function (key) {
     assert.ok(game.includes('"' + key + '"'), key);
   });
   assert.equal(seen.plank, true);

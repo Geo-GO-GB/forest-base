@@ -19,10 +19,6 @@
     return state.backpack ? cfg().backpackCarry : cfg().baseCarry;
   }
 
-  function storageCap(state) {
-    return cfg().baseStorage + (state.buildings.box ? cfg().boxStorageBonus : 0);
-  }
-
   function haveTotal(state, id) {
     return (state.storage[id] || 0) + (state.carry[id] || 0);
   }
@@ -420,7 +416,6 @@
   root.Sim = {
     bagCount: bagCount,
     carryCap: carryCap,
-    storageCap: storageCap,
     haveTotal: haveTotal,
     collect: collect,
     deposit: deposit,

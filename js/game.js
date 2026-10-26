@@ -715,17 +715,14 @@
   }
 
   function drawBuildingArt(scene, id, parent) {
-    if (id === "box" || id === "workbench" || id === "desk") {
+    if (id === "workbench" || id === "desk") {
       const art = placeScaled(scene, id, cfg().art.furniture, 1);
       if (art) {
         parent.add(art);
         return;
       }
     }
-    if (id === "box") {
-      parent.add(scene.add.rectangle(0, 4, 34, 22, 0x8a5a32).setStrokeStyle(3, 0x3c2f26));
-      parent.add(scene.add.rectangle(0, -8, 38, 8, 0xa56b3c).setStrokeStyle(3, 0x3c2f26));
-    } else if (id === "workbench") {
+    if (id === "workbench") {
       parent.add(scene.add.rectangle(0, 8, 42, 16, 0x6b4630).setStrokeStyle(3, 0x3c2f26));
       runtime.saw = scene.add.rectangle(0, -4, 18, 6, 0xd7d3cb).setStrokeStyle(2, 0x3c2f26);
       parent.add(runtime.saw);

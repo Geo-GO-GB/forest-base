@@ -118,8 +118,6 @@
     backpackCarry: 18,
     backpackCost: 8,
     backpackName: "小さなリュック",
-    baseStorage: 16,
-    boxStorageBonus: 28,
     maxFrameMs: 100,
     autosaveMs: 4000,
 
@@ -135,9 +133,8 @@
       groveRadius: 150,
     },
 
-    /* 小屋（base.png × 1.25、足元が拠点の中心）の外に置く。机とお店は左右、木箱と作業台は手前。 */
+    /* 小屋（base.png × 1.25、足元が拠点の中心）の外に置く。机とお店は左右、作業台は手前。 */
     slots: {
-      box: { x: 545, y: 1392 },
       workbench: { x: 755, y: 1392 },
       desk: { x: 500, y: 1508 },
       shop: { x: 760, y: 1524 },
@@ -336,12 +333,6 @@
     pack: { idleY: -8, downY: -8, upY: -6, sideY: -8, sideX: 7 },
 
     buildings: {
-      box: {
-        name: "木箱",
-        effect: "秘密基地に置く木箱",
-        coins: 4,
-        cost: { twig: 3, pebble: 2 },
-      },
       workbench: {
         name: "作業台",
         effect: "枝を木材にし、品物も作る",
@@ -357,7 +348,7 @@
       },
     },
 
-    buildingOrder: ["box", "workbench", "desk"],
+    buildingOrder: ["workbench", "desk"],
     treeCount: 30,
     flowerCount: 42,
     layoutSeed: 20261025,
