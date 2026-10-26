@@ -129,44 +129,46 @@
     return html;
   }
 
+  function renderCrewBlock(id) {
+    const spec = CFG().crew[id];
+    const blurb = {
+      gather: spec.resource === "twig"
+        ? "枝のある場所まで歩いて拾い、何本か持って秘密基地に届ける。"
+        : spec.resource === "pebble"
+          ? "小石のある場所まで歩いて拾い、秘密基地に届ける。"
+          : "木の実のある場所まで歩いて拾い、秘密基地に届ける。",
+      craft: "作業台まで歩いて品を作り、在庫に入れる。",
+      clerk: "在庫の品を持ってお店の台まで歩き、空いた場所に飾る。",
+    };
+    let html = '<section class="offer">';
+    html += "<h3>" + spec.name + "</h3>";
+    html += "<p>" + (blurb[spec.kind] || "") + "</p>";
+    html += "<p>コイン " + fmt(spec.hireCost) + "</p>";
+    html += '<button type="button" data-hire-role="' + id + '">雇う</button>';
+    html += '<p class="note" data-hire-note="' + id + '"></p>';
+    html += '<p data-crew-line="' + id + '"></p>';
+    const tracks = ["speed", "carry", "haste", "n"];
+    for (let i = 0; i < tracks.length; i += 1) {
+      const track = tracks[i];
+      const row = spec.upgrades[track];
+      html += '<p class="note" data-upgrade-line="' + id + ":" + track + '">' + row.name + "</p>";
+      html += '<button type="button" data-upgrade="' + id + ":" + track + '">' + row.name + "</button>";
+    }
+    html += "</section>";
+    return html;
+  }
+
   function renderHelpers() {
     const cfg = CFG();
     const inputName = cfg.resources[cfg.workbench.input].name;
     const outputName = cfg.resources[cfg.workbench.output].name;
-    const helperName = cfg.resources[cfg.helper.resource].name;
-    return (
+    let html =
       '<p class="summary" data-summary></p>' +
       '<p class="hint" data-base-hint></p>' +
-      "<p>木こりが" +
-      helperName +
-      "を集める → 作業台が" +
-      inputName +
-      cfg.workbench.inputAmount +
-      "を" +
-      outputName +
-      cfg.workbench.outputAmount +
-      "にする → 保管にしまう。</p>" +
-      "<p class='hint'>開いているあいだだけ進む。閉じている間は増えない。</p>" +
-      '<section class="offer">' +
-      "<h3>" +
-      cfg.helper.name +
-      "</h3>" +
-      "<p>" +
-      sec(cfg.helper.intervalMs) +
-      "秒ごとに" +
-      helperName +
-      "を" +
-      cfg.helper.amount +
-      "個、保管へ。</p>" +
-      "<p>コイン " +
-      fmt(cfg.helper.hireCost) +
-      "</p>" +
-      '<button type="button" data-hire>雇う</button>' +
-      '<p class="note" data-hire-note></p>' +
-      '<p data-status="helper"></p>' +
-      '<p class="note" data-remedy="helper"></p>' +
-      '<div class="bar" data-bar-wrap="helper"><div data-bar="helper"></div></div>' +
-      "</section>" +
+      "<p>仲間が材料を届け、作業台が品を作り、店番が台に飾る。</p>" +
+      "<p class='hint'>開いているあいだだけ歩く。閉じている間は増えない。</p>";
+    for (let i = 0; i < cfg.crewOrder.length; i += 1) html += renderCrewBlock(cfg.crewOrder[i]);
+    html +=
       '<section class="offer">' +
       "<h3>作業台</h3>" +
       "<p>" +
@@ -184,8 +186,8 @@
       '<p class="note" data-remedy="workbench"></p>' +
       '<div class="bar" data-bar-wrap="workbench"><div data-bar="workbench"></div></div>' +
       "</section>" +
-      renderCraft()
-    );
+      renderCraft();
+    return html;
   }
 
   function productCost(def) {
@@ -273,7 +275,7 @@
 
   function remedy(code) {
     if (code === "full") return "売って減らすか、木箱を建てるとまた動く";
-    if (code === "no-input") return "枝を拾うか、木こりを雇うと進む";
+    if (code === "no-input") return "枝を拾うか、枝拾いおじさんを雇うと進む";
     if (code === "run") return "開いているあいだだけ進む";
     return "";
   }
@@ -290,15 +292,31 @@
     lastExtra = extra || lastExtra || { inBase: false, statuses: { helper: "off", workbench: "off" }, nearMushroom: false };
     const pocketCoins = $("pocket-coins");
     if (pocketCoins) pocketCoins.textContent = fmt(state.coins);
+    const hold = (lastExtra && lastExtra.hudHold) || {};
     CFG().resourceOrder.forEach(function (id) {
       const el = document.querySelector("[data-pocket='" + id + "']");
-      if (el) el.textContent = fmt(root.Sim.haveTotal(state, id));
+      if (!el) return;
+      // 左上は保管の数。運んでいるあいだは足さず、飛んできたときに増える。
+      const shown = Math.max(0, (state.storage[id] || 0) - (hold[id] || 0));
+      const prev = Number(el.dataset.shown || "0");
+      el.dataset.shown = String(shown);
+      el.textContent = fmt(shown);
+      if (shown > prev) {
+        el.classList.remove("tick");
+        void el.offsetWidth;
+        el.classList.add("tick");
+      }
     });
     $("save-label").textContent = state.savedAt ? "保存 " + formatTime(state.savedAt) : "未保存";
     const statuses = lastExtra.statuses || { helper: "off", workbench: "off" };
     const inputName = CFG().resources[CFG().workbench.input].name;
     const bits = [];
-    if (state.helperHired) bits.push("木こり: " + statusName(statuses.helper, inputName));
+    root.Sim.ensureCrew(state);
+    const hiredNames = [];
+    CFG().crewOrder.forEach(function (id) {
+      if (state.crew[id].hired) hiredNames.push(CFG().crew[id].name);
+    });
+    if (hiredNames.length) bits.push(hiredNames[0] + (hiredNames.length > 1 ? "、ほか" : ""));
     if (state.buildings.workbench) bits.push("作業台: " + statusName(statuses.workbench, inputName));
     const pill = $("status-pill");
     pill.textContent = bits.length ? bits.join(" / ") : "歩いて、枝や小石を集めよう";
@@ -403,34 +421,57 @@
       else if (check.reason === "no-materials") note.textContent = "材料が足りない";
       else note.textContent = "建てられる";
     });
-    const hire = body.querySelector("[data-hire]");
-    if (hire) {
-      if (state.helperHired) setDisabled(hire, true, "来た");
-      else setDisabled(hire, !extra.inBase || !root.Sim.canHire(state).ok, "雇う");
-    }
-    const hireNote = body.querySelector("[data-hire-note]");
-    if (hireNote) {
-      if (state.helperHired) hireNote.textContent = "秘密基地で働いている";
-      else if (!extra.inBase) hireNote.textContent = "秘密基地に戻ると雇える";
-      else if (!root.Sim.canHire(state).ok) hireNote.textContent = "コインが足りない";
-      else hireNote.textContent = "雇える";
-    }
+    root.Sim.ensureCrew(state);
+    const jobs = (extra && extra.jobs) || {};
+    CFG().crewOrder.forEach(function (id) {
+      const spec = CFG().crew[id];
+      const rec = state.crew[id];
+      const stats = root.Sim.crewStats(state, id);
+      const hire = body.querySelector('[data-hire-role="' + id + '"]');
+      const note = body.querySelector('[data-hire-note="' + id + '"]');
+      const check = root.Sim.canHireRole(state, id);
+      if (hire) {
+        if (rec.hired) setDisabled(hire, true, "来た");
+        else setDisabled(hire, !extra.inBase || !check.ok, "雇う");
+      }
+      if (note) {
+        if (rec.hired) note.textContent = "人数 " + fmt(stats.n);
+        else if (!extra.inBase) note.textContent = "秘密基地に戻ると雇える";
+        else if (check.reason === "need-bench") note.textContent = "作業台を建てると雇える";
+        else if (check.reason === "no-coins") note.textContent = "コインが足りない";
+        else note.textContent = "雇える";
+      }
+      const line = body.querySelector('[data-crew-line="' + id + '"]');
+      if (line) line.textContent = rec.hired ? jobs[id] || "基地で待っている" : "";
+      ["speed", "carry", "haste", "n"].forEach(function (track) {
+        const button = body.querySelector('[data-upgrade="' + id + ":" + track + '"]');
+        const label = body.querySelector('[data-upgrade-line="' + id + ":" + track + '"]');
+        const row = spec.upgrades[track];
+        const level = rec[track] || 0;
+        const max = row.costs.length;
+        const cost = root.Sim.upgradeCost(state, id, track);
+        if (label) {
+          label.textContent = row.name + " " + fmt(level + 1) + "/" + fmt(max + 1);
+        }
+        if (!button) return;
+        if (!rec.hired || !(cost > 0)) setDisabled(button, true, rec.hired ? "上限" : row.name);
+        else setDisabled(button, !extra.inBase || state.coins < cost, row.name + " " + fmt(cost));
+      });
+    });
     const inputName = CFG().resources[CFG().workbench.input].name;
-    ["helper", "workbench"].forEach(function (key) {
+    ["workbench"].forEach(function (key) {
       const statusEl = body.querySelector('[data-status="' + key + '"]');
       const remedyEl = body.querySelector('[data-remedy="' + key + '"]');
-      const active = key === "helper" ? state.helperHired : state.buildings.workbench;
+      const active = state.buildings.workbench;
       const code = active ? extra.statuses[key] : "off";
-      if (statusEl) {
-        statusEl.textContent = active ? statusName(code, inputName) : key === "helper" ? "まだ来ていない" : "まだない";
-      }
+      if (statusEl) statusEl.textContent = active ? statusName(code, inputName) : "まだない";
       if (remedyEl) remedyEl.textContent = active ? remedy(code) : "";
       const bar = body.querySelector('[data-bar="' + key + '"]');
       const wrap = body.querySelector('[data-bar-wrap="' + key + '"]');
       if (wrap) wrap.hidden = !active;
       if (bar && active) {
-        const interval = key === "helper" ? CFG().helper.intervalMs : CFG().workbench.intervalMs;
-        const value = key === "helper" ? state.progress.helperMs : state.progress.workbenchMs;
+        const interval = CFG().workbench.intervalMs;
+        const value = state.progress.workbenchMs;
         bar.style.width = Math.max(0, Math.min(1, value / interval)) * 100 + "%";
       }
     });
@@ -516,7 +557,11 @@
       else if (button.dataset.craft) actions.onCraft(button.dataset.craft);
       else if (button.dataset.show) actions.onShow(button.dataset.show);
       else if (button.dataset.buy) actions.onBuy();
-      else if (button.dataset.hire != null) actions.onHire();
+      else if (button.dataset.hireRole) actions.onHireRole(button.dataset.hireRole);
+      else if (button.dataset.upgrade) {
+        const parts = button.dataset.upgrade.split(":");
+        actions.onUpgrade(parts[0], parts[1]);
+      }
       else if (button.dataset.save != null) actions.onSave();
       else if (button.dataset.reset != null) $("confirm").hidden = false;
       else if (button.dataset.confirmReset != null) actions.onReset();

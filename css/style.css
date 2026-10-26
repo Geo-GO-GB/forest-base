@@ -295,6 +295,21 @@ body.playing #pocket {
   flex: 0 0 26px;
 }
 
+.pocket-row b {
+  display: inline-block;
+  transform-origin: 40% 80%;
+}
+
+.pocket-row b.tick {
+  animation: pocket-bump 180ms ease-out;
+}
+
+@keyframes pocket-bump {
+  0% { transform: translateY(0) scale(1); }
+  40% { transform: translateY(-4px) scale(1.35); }
+  100% { transform: translateY(0) scale(1); }
+}
+
 .coin-icon {
   width: 22px;
   height: 22px;
@@ -542,4 +557,5 @@ body:has(#action-btn:not([hidden])) { --dock-h: 88px; }
 
 @media (prefers-reduced-motion: reduce) {
   .toast.out { transition: none; }
+  .pocket-row b.tick { animation: none; }
 }

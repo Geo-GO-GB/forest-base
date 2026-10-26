@@ -51,6 +51,11 @@
     lastCarryToast: 0,
     lastStorageToast: 0,
     helperPhase: 0,
+    crew: {},
+    jobs: {},
+    hudHold: {},
+    flyQueue: [],
+    flyGap: 0,
     dodge: [],
     playerBody: null,
     helperBody: null,
@@ -85,6 +90,8 @@
       inBase: runtime.inBase,
       statuses: runtime.statuses,
       nearMushroom: !!runtime.nearId,
+      hudHold: runtime.hudHold,
+      jobs: runtime.jobs,
     };
   }
 
@@ -347,16 +354,31 @@
     doSave(false);
   }
 
-  function onHire() {
+  function onHireRole(id) {
     if (!runtime.state || !ensureBase()) return;
-    const result = root.Sim.hire(runtime.state);
+    const result = root.Sim.hireRole(runtime.state, id);
     if (!result.ok) {
       toastReason(result.reason);
       runtime.forceUi = true;
       return;
     }
-    if (runtime.helper) runtime.helper.setVisible(true);
-    root.UI.toast("木こりが来た。開いているあいだ、枝を集める");
+    if (runtime.scene) syncCrewActors(runtime.scene);
+    const spec = cfg().crew[id];
+    root.UI.toast(spec.name + "が来た");
+    doSave(false);
+  }
+
+  function onUpgrade(id, track) {
+    if (!runtime.state || !ensureBase()) return;
+    const result = root.Sim.upgradeRole(runtime.state, id, track);
+    if (!result.ok) {
+      toastReason(result.reason);
+      runtime.forceUi = true;
+      return;
+    }
+    if (runtime.scene) syncCrewActors(runtime.scene);
+    const row = cfg().crew[id].upgrades[track];
+    root.UI.toast(cfg().crew[id].name + "の" + row.name);
     doSave(false);
   }
 
@@ -952,29 +974,6 @@
     return c;
   }
 
-  function drawHelper(scene) {
-    const art = cfg().art;
-    const path = cfg().helperPath;
-    const c = scene.add.container(path.x1, path.y1);
-    c.add(scene.add.ellipse(0, 1, art.shadowW, art.shadowH, 0x1a2418, 0.28));
-    const body = makeActor(scene, "helper-idle", "helper");
-    if (body) {
-      runtime.helperBody = body;
-      c.add(body);
-    } else {
-      c.add(scene.add.ellipse(0, 6, 22, 26, 0x8a5a32).setStrokeStyle(2, 0x3c2f26));
-      c.add(scene.add.circle(0, -12, 10, 0xf3c7a5).setStrokeStyle(2, 0x3c2f26));
-      c.add(scene.add.ellipse(0, -18, 22, 8, 0xe2b14a).setStrokeStyle(2, 0x3c2f26));
-      c.add(scene.add.circle(-3.5, -12, 1.3, 0x2c241c));
-      c.add(scene.add.circle(3.5, -12, 1.3, 0x2c241c));
-    }
-    runtime.helperBubble = markDodge(scene.add.text(0, -74, "", fontStyle(13)).setOrigin(0.5));
-    c.add(runtime.helperBubble);
-    c.setVisible(runtime.state.helperHired);
-    c.setDepth(100 + path.y1);
-    return c;
-  }
-
   function zoomFor(width) {
     const camera = cfg().camera;
     if (width < 520) return camera.phone;
@@ -1107,7 +1106,7 @@
     drawSlots(scene);
     syncBuildings();
     runtime.player = drawPlayer(scene, state.player.x, state.player.y);
-    runtime.helper = drawHelper(scene);
+    syncCrewActors(scene);
     const cam = scene.cameras.main;
     cam.useBounds = false;
     updateCamera(scene);
@@ -1177,9 +1176,13 @@
     const world = cfg().world;
     runtime.inBase = Math.hypot(state.player.x - world.baseX, state.player.y - world.baseY) <= world.baseRadius;
     if (!runtime.inBase || root.Sim.bagCount(state.carry) <= 0) return;
+    const taken = {};
+    cfg().resourceOrder.forEach(function (id) {
+      taken[id] = state.carry[id] || 0;
+    });
     const result = root.Sim.deposit(state);
     if (result.moved) {
-      floatText(state.player.x, state.player.y - 28, "保管した");
+      enqueueFlies(state.player.x, state.player.y - 8, taken);
       reachTutorial(3);
       doSave(false);
     }
@@ -1189,10 +1192,10 @@
   function announce(prev, next) {
     if (!prev) return;
     if (next.helper === "full" && prev.helper !== "full") {
-      root.UI.toast("木こり: 保管がいっぱい。売るか、木箱を建てるとまた動く");
+      root.UI.toast("仲間: 保管がいっぱい。売るとまた動く");
     }
     if (next.workbench === "no-input" && prev.workbench !== "no-input") {
-      root.UI.toast("作業台: 枝が足りない。拾うか、木こりを雇うと進む");
+      root.UI.toast("作業台: 枝が足りない。拾うか、枝拾いおじさんを雇うと進む");
     }
     if (next.workbench === "full" && prev.workbench !== "full") {
       root.UI.toast("作業台: 保管がいっぱい");
@@ -1222,27 +1225,498 @@
     }
   }
 
-  function updateHelper(step) {
-    const state = runtime.state;
-    if (!runtime.helper) return;
-    runtime.helper.setVisible(state.helperHired);
-    if (!state.helperHired) return;
-    const path = cfg().helperPath;
-    const working = runtime.statuses.helper === "run";
-    if (working) runtime.helperPhase += step;
-    const t = (Math.sin(runtime.helperPhase / 420) + 1) / 2;
-    const prevX = runtime.helper.x;
-    const prevY = runtime.helper.y;
-    const x = working ? path.x1 + (path.x2 - path.x1) * t : path.x1;
-    const y = working ? path.y1 + (path.y2 - path.y1) * t : path.y1;
-    runtime.helper.setPosition(x, y);
-    runtime.helper.setDepth(100 + y);
-    applyFacing(runtime.helperBody, null, x - prevX, y - prevY, "helper");
-    if (runtime.helperBubble && runtime.helperBubble.parentContainer) {
-      runtime.helperBubble.parentContainer.bringToTop(runtime.helperBubble);
+  function screenToWorld(scene, sx, sy) {
+    const cam = scene.cameras.main;
+    const canvas = scene.game.canvas.getBoundingClientRect();
+    const px = (sx - canvas.left) * (cam.width / Math.max(1, canvas.width));
+    const py = (sy - canvas.top) * (cam.height / Math.max(1, canvas.height));
+    return {
+      x: cam.scrollX + px / cam.zoom,
+      y: cam.scrollY + py / cam.zoom,
+    };
+  }
+
+  function pocketPoint(scene, id) {
+    const el = document.querySelector("[data-pocket='" + id + "']");
+    if (!el) return null;
+    const rect = el.getBoundingClientRect();
+    return screenToWorld(scene, rect.left + rect.width / 2, rect.top + rect.height / 2);
+  }
+
+  function enqueueFlies(x, y, counts) {
+    cfg().resourceOrder.forEach(function (id) {
+      const n = counts[id] || 0;
+      if (n <= 0) return;
+      runtime.hudHold[id] = (runtime.hudHold[id] || 0) + n;
+      const shown = Math.min(n, 5);
+      let left = n;
+      for (let i = 0; i < shown; i += 1) {
+        const amount = i === shown - 1 ? left : 1;
+        left -= amount;
+        runtime.flyQueue.push({
+          id: id,
+          amount: amount,
+          x: x + (i - (shown - 1) / 2) * 8,
+          y: y,
+        });
+      }
+    });
+    runtime.forceUi = true;
+  }
+
+  function releaseHold(id, amount) {
+    runtime.hudHold[id] = Math.max(0, (runtime.hudHold[id] || 0) - amount);
+    runtime.forceUi = true;
+  }
+
+  function spawnFly(scene, job) {
+    const dest = pocketPoint(scene, job.id) || { x: job.x, y: job.y - 70 };
+    const start = { x: job.x, y: job.y - 16 };
+    let icon = null;
+    if (scene.textures.exists(job.id)) {
+      icon = scene.add.image(start.x, start.y, job.id);
+      icon.setScale(0.42);
+    } else {
+      icon = scene.add.circle(start.x, start.y, 6, cfg().resources[job.id].color);
     }
-    const code = runtime.statuses.helper;
-    runtime.helperBubble.setText(code === "full" ? "満杯" : code === "run" ? cfg().helper.name : "");
+    icon.setDepth(9000);
+    const proxy = { t: 0 };
+    scene.tweens.add({
+      targets: proxy,
+      t: 1,
+      duration: 420,
+      ease: "Sine.easeInOut",
+      onUpdate: function () {
+        const live = pocketPoint(scene, job.id) || dest;
+        const hop = {
+          x: (start.x + live.x) / 2,
+          y: Math.min(start.y, live.y) - 48,
+        };
+        const t = proxy.t;
+        const u = 1 - t;
+        icon.x = u * u * start.x + 2 * u * t * hop.x + t * t * live.x;
+        icon.y = u * u * start.y + 2 * u * t * hop.y + t * t * live.y;
+        const pop = t < 0.18 ? t / 0.18 : 1;
+        icon.setScale((0.2 + pop * 0.28) + Math.sin(Math.min(1, t) * Math.PI) * 0.12);
+      },
+      onComplete: function () {
+        const live = pocketPoint(scene, job.id);
+        if (live) icon.setPosition(live.x, live.y);
+        scene.tweens.add({
+          targets: icon,
+          y: icon.y - 10,
+          scaleX: 0.62,
+          scaleY: 0.62,
+          duration: 110,
+          yoyo: true,
+          ease: "Quad.easeOut",
+          onComplete: function () {
+            icon.destroy();
+            releaseHold(job.id, job.amount);
+          },
+        });
+      },
+    });
+  }
+
+  function updateFlies(scene, step) {
+    if (!runtime.flyQueue.length) return;
+    runtime.flyGap -= step;
+    if (runtime.flyGap > 0) return;
+    spawnFly(scene, runtime.flyQueue.shift());
+    runtime.flyGap = runtime.flyQueue.length ? 120 : 0;
+  }
+
+  function deliverStore(x, y, id, count) {
+    const gained = root.Sim.grantStorage(runtime.state, id, count);
+    if (gained <= 0) return;
+    const bag = {};
+    bag[id] = gained;
+    enqueueFlies(x, y, bag);
+    doSave(false);
+  }
+
+  function agentHome(spec, index) {
+    return {
+      x: spec.home.x + (index === 1 ? -36 : index === 2 ? 36 : 0),
+      y: spec.home.y + (index === 0 ? 0 : 22),
+    };
+  }
+
+  function spawnAgent(scene, role, index) {
+    const spec = cfg().crew[role];
+    const home = agentHome(spec, index);
+    const art = cfg().art;
+    const container = scene.add.container(home.x, home.y);
+    container.add(scene.add.ellipse(0, 1, art.shadowW, art.shadowH, 0x1a2418, 0.28));
+    const body = makeActor(scene, "helper-idle", "helper");
+    if (!body) {
+      const blob = scene.add.ellipse(0, -10, 18, 24, spec.tint || 0x8a5a32);
+      container.add(blob);
+    } else {
+      if (spec.tint) body.setTint(spec.tint);
+      container.add(body);
+    }
+    let hold = null;
+    if (spec.kind === "gather" && scene.textures.exists(spec.resource)) {
+      hold = scene.add.image(12, -30, spec.resource);
+      hold.setScale(0.32);
+      hold.setVisible(false);
+      container.add(hold);
+    }
+    container.setDepth(100 + home.y);
+    return {
+      role: role,
+      index: index,
+      x: home.x,
+      y: home.y,
+      phase: "wait",
+      purpose: "",
+      path: null,
+      pi: 0,
+      carry: 0,
+      actMs: 0,
+      waitMs: index * 280,
+      popped: false,
+      stuckMs: 0,
+      targetId: "",
+      recent: [],
+      root: container,
+      body: body,
+      hold: hold,
+    };
+  }
+
+  function syncCrewActors(scene) {
+    if (!scene || !runtime.state) return;
+    root.Sim.ensureCrew(runtime.state);
+    cfg().crewOrder.forEach(function (role) {
+      const stats = root.Sim.crewStats(runtime.state, role);
+      if (!runtime.crew[role]) runtime.crew[role] = [];
+      const list = runtime.crew[role];
+      while (list.length < stats.n) list.push(spawnAgent(scene, role, list.length));
+      while (list.length > stats.n) {
+        const extra = list.pop();
+        const spec = cfg().crew[role];
+        if (extra.carry > 0 && spec.kind === "gather") deliverStore(extra.x, extra.y, spec.resource, extra.carry);
+        extra.root.destroy();
+      }
+    });
+  }
+
+  function setPath(agent, to) {
+    agent.path = root.Nav.route(agent, to, runtime.colliders, cfg().world, cfg().art.bodyRadius);
+    agent.pi = 0;
+    agent.stuckMs = 0;
+  }
+
+  function reservedNodes(role, self) {
+    const used = {};
+    const list = runtime.crew[role] || [];
+    for (let i = 0; i < list.length; i += 1) {
+      const other = list[i];
+      if (other !== self && other.targetId) used[other.targetId] = true;
+    }
+    return used;
+  }
+
+  function nearestSpot(agent) {
+    const spec = cfg().crew[agent.role];
+    const used = reservedNodes(agent.role, agent);
+    let best = null;
+    let bestD = Infinity;
+    cfg().nodes.forEach(function (node) {
+      if (node.type !== spec.resource) return;
+      if (used[node.id] || agent.recent.indexOf(node.id) >= 0) return;
+      const d = Math.hypot(node.x - agent.x, node.y - agent.y);
+      if (d < bestD) {
+        bestD = d;
+        best = node;
+      }
+    });
+    if (best) return best;
+    cfg().nodes.forEach(function (node) {
+      if (node.type !== spec.resource || used[node.id]) return;
+      const d = Math.hypot(node.x - agent.x, node.y - agent.y);
+      if (d < bestD) {
+        bestD = d;
+        best = node;
+      }
+    });
+    return best;
+  }
+
+  function canCraftAny(state) {
+    const order = cfg().productOrder;
+    for (let i = 0; i < order.length; i += 1) {
+      if (root.Sim.canCraft(state, order[i]).ok) return order[i];
+    }
+    return "";
+  }
+
+  function canPlaceAny(state) {
+    const open = (state.display || []).some(function (slot) {
+      return !slot;
+    });
+    if (!open) return false;
+    const order = cfg().productOrder;
+    for (let i = 0; i < order.length; i += 1) {
+      if ((state.goods[order[i]] || 0) > 0) return true;
+    }
+    return false;
+  }
+
+  function beginWalk(agent, to, purpose, targetId) {
+    agent.purpose = purpose;
+    agent.targetId = targetId || "";
+    agent.phase = "walk";
+    agent.popped = false;
+    setPath(agent, to);
+  }
+
+  function startTask(agent, stats) {
+    const spec = cfg().crew[agent.role];
+    const state = runtime.state;
+    if (spec.kind === "gather") {
+      if (agent.carry >= stats.carry) {
+        beginWalk(agent, agentHome(spec, agent.index), "give", "");
+        return true;
+      }
+      const spot = nearestSpot(agent);
+      if (!spot) return false;
+      beginWalk(agent, { x: spot.x, y: spot.y }, "pick", spot.id);
+      return true;
+    }
+    if (spec.kind === "craft") {
+      if (!state.buildings.workbench || !canCraftAny(state)) return false;
+      const stand = spec.stand;
+      beginWalk(agent, { x: stand.x + agent.index * 18, y: stand.y }, "make", "");
+      return true;
+    }
+    if (!canPlaceAny(state)) return false;
+    const stand = spec.stand;
+    beginWalk(agent, { x: stand.x + agent.index * 16, y: stand.y }, "place", "");
+    return true;
+  }
+
+  function popLoose(scene, x, y, key) {
+    if (!scene.textures.exists(key)) return;
+    const img = scene.add.image(x, y - 28, key).setScale(0.5).setDepth(7000);
+    scene.tweens.add({
+      targets: img,
+      y: y - 54,
+      alpha: 0,
+      scale: 0.52,
+      duration: 480,
+      ease: "Quad.easeOut",
+      onComplete: function () {
+        img.destroy();
+      },
+    });
+  }
+
+  function performAct(scene, agent, stats) {
+    const spec = cfg().crew[agent.role];
+    const state = runtime.state;
+    if (agent.purpose === "back") return;
+    if (agent.purpose === "pick") {
+      agent.carry += 1;
+      if (agent.recent.length > 2) agent.recent.shift();
+      if (agent.targetId) agent.recent.push(agent.targetId);
+      popLoose(scene, agent.x, agent.y, spec.resource);
+      if (agent.hold) agent.hold.setVisible(true);
+      return;
+    }
+    if (agent.purpose === "give") {
+      const n = agent.carry;
+      agent.carry = 0;
+      if (agent.hold) agent.hold.setVisible(false);
+      if (n > 0) deliverStore(agent.x, agent.y, spec.resource, n);
+      return;
+    }
+    if (agent.purpose === "make") {
+      const batch = stats.carry;
+      for (let i = 0; i < batch; i += 1) {
+        const id = canCraftAny(state);
+        if (!id) break;
+        const made = root.Sim.craft(state, id);
+        if (!made.ok) break;
+        const token = scene.add.rectangle(agent.x + i * 8, agent.y - 24, 12, 10, cfg().products[id].color);
+        token.setStrokeStyle(2, 0x3c2f26);
+        token.setDepth(7000);
+        scene.tweens.add({
+          targets: token,
+          y: agent.y - 58,
+          alpha: 0,
+          duration: 520,
+          onComplete: function () {
+            token.destroy();
+          },
+        });
+      }
+      runtime.forceUi = true;
+      doSave(false);
+      return;
+    }
+    if (agent.purpose !== "place") return;
+    const places = stats.carry;
+    for (let i = 0; i < places; i += 1) {
+      if (!canPlaceAny(state)) break;
+      const order = cfg().productOrder;
+      for (let p = 0; p < order.length; p += 1) {
+        if ((state.goods[order[p]] || 0) <= 0) continue;
+        const placed = root.Sim.displayProduct(state, order[p]);
+        if (placed.ok) break;
+      }
+    }
+    syncDisplay();
+    runtime.forceUi = true;
+    doSave(false);
+  }
+
+  function followPath(agent, speed, dt) {
+    let left = Math.max(0, speed * dt);
+    let vx = 0;
+    let vy = 0;
+    const x0 = agent.x;
+    const y0 = agent.y;
+    while (left > 0 && agent.path && agent.pi < agent.path.length) {
+      const target = agent.path[agent.pi];
+      const dx = target.x - agent.x;
+      const dy = target.y - agent.y;
+      const dist = Math.hypot(dx, dy);
+      if (dist < 2.5) {
+        agent.x = target.x;
+        agent.y = target.y;
+        agent.pi += 1;
+        continue;
+      }
+      const step = Math.min(dist, left);
+      vx = dx / dist;
+      vy = dy / dist;
+      agent.x += vx * step;
+      agent.y += vy * step;
+      left -= step;
+      if (step >= dist - 0.001) {
+        agent.x = target.x;
+        agent.y = target.y;
+        agent.pi += 1;
+      } else {
+        break;
+      }
+    }
+    const moved = Math.hypot(agent.x - x0, agent.y - y0);
+    if (moved < 0.15) agent.stuckMs += dt * 1000;
+    else agent.stuckMs = 0;
+    const arrived = !agent.path || agent.pi >= agent.path.length;
+    return {
+      arrived: arrived,
+      vx: arrived ? 0 : vx,
+      vy: arrived ? 0 : vy,
+      stuck: agent.stuckMs > 800,
+    };
+  }
+
+  function jobText(agent) {
+    const spec = cfg().crew[agent.role];
+    if (agent.phase === "wait") return spec.name + "は待っている";
+    if (agent.purpose === "pick") return agent.phase === "act" ? "拾っている" : "拾いに行く";
+    if (agent.purpose === "give") return agent.phase === "act" ? "届けている" : "基地に戻る";
+    if (agent.purpose === "make") return agent.phase === "act" ? "作っている" : "作業台へ行く";
+    if (agent.purpose === "place") return agent.phase === "act" ? "飾っている" : "お店へ行く";
+    if (agent.purpose === "back") return "戻っている";
+    return "歩いている";
+  }
+
+  function updateAgent(scene, agent, step, stats) {
+    const spec = cfg().crew[agent.role];
+    if (agent.phase === "wait") {
+      agent.waitMs += step;
+      if (agent.body) applyFacing(agent.body, null, 0, 0, "helper");
+      if (agent.body) agent.body.setY(0);
+      if (agent.waitMs < 280) return;
+      agent.waitMs = 0;
+      if (!startTask(agent, stats)) return;
+    }
+    if (agent.phase === "walk") {
+      const moved = followPath(agent, stats.speed, step / 1000);
+      agent.root.setPosition(agent.x, agent.y);
+      agent.root.setDepth(100 + agent.y + 1);
+      if (agent.body) {
+        agent.body.setY(0);
+        const base = cfg().art.characters;
+        agent.body.setScale(base, base);
+        applyFacing(agent.body, null, moved.vx, moved.vy, "helper");
+      }
+      if (moved.stuck) {
+        agent.phase = "wait";
+        agent.targetId = "";
+        agent.recent = [];
+        return;
+      }
+      if (moved.arrived) {
+        agent.phase = "act";
+        agent.actMs = 0;
+        agent.popped = false;
+      }
+      return;
+    }
+    if (agent.phase !== "act") return;
+    agent.actMs += step;
+    const u = Math.max(0, Math.min(1, agent.actMs / Math.max(1, stats.actMs)));
+    const bob = Math.sin(u * Math.PI);
+    if (agent.body) {
+      agent.body.setY(0);
+      const base = cfg().art.characters;
+      const squat = 1 - bob * 0.34;
+      agent.body.setScale(base * (1 + bob * 0.08), base * squat);
+      applyFacing(agent.body, null, 0, 0, "helper");
+    }
+    if (!agent.popped && u >= 0.4) {
+      agent.popped = true;
+      performAct(scene, agent, stats);
+    }
+    if (u < 1) return;
+    if (agent.body) {
+      agent.body.setY(0);
+      agent.body.setScale(cfg().art.characters, cfg().art.characters);
+    }
+    if (agent.purpose === "pick" && agent.carry < stats.carry) {
+      const spot = nearestSpot(agent);
+      if (spot) {
+        beginWalk(agent, { x: spot.x, y: spot.y }, "pick", spot.id);
+        return;
+      }
+    }
+    if (agent.purpose === "pick") {
+      beginWalk(agent, agentHome(spec, agent.index), "give", "");
+      return;
+    }
+    if (agent.purpose === "make" || agent.purpose === "place") {
+      beginWalk(agent, agentHome(spec, agent.index), "back", "");
+      return;
+    }
+    agent.phase = "wait";
+    agent.purpose = "";
+    agent.targetId = "";
+    agent.waitMs = 0;
+  }
+
+  function updateCrew(scene, step) {
+    if (!runtime.state) return;
+    syncCrewActors(scene);
+    const jobs = {};
+    cfg().crewOrder.forEach(function (role) {
+      const stats = root.Sim.crewStats(runtime.state, role);
+      const list = runtime.crew[role] || [];
+      let line = "";
+      for (let i = 0; i < list.length; i += 1) {
+        updateAgent(scene, list[i], step, stats);
+        if (!line) line = jobText(list[i]);
+      }
+      if (stats.hired) jobs[role] = line || "基地で待っている";
+    });
+    runtime.jobs = jobs;
   }
 
   function sceneUpdate(scene, time, delta) {
@@ -1255,7 +1729,8 @@
     updateDeposit(time);
     updateProduction(step, time);
     syncNodes();
-    updateHelper(step);
+    updateCrew(scene, step);
+    updateFlies(scene, step);
     updateVisitor(scene, step);
     syncDisplay();
     dodgeLabels();
@@ -1326,7 +1801,11 @@
       },
       onSell: onSell,
       onBuild: onBuild,
-      onHire: onHire,
+      onHire: function () {
+        onHireRole("twig");
+      },
+      onHireRole: onHireRole,
+      onUpgrade: onUpgrade,
       onBuy: onBuy,
       onCraft: onCraft,
       onShow: onShow,
@@ -1401,6 +1880,35 @@
           screenX: Math.round((p.x - cam.scrollX) * cam.zoom),
           screenY: Math.round((p.y - cam.scrollY) * cam.zoom),
           offsetY: cam.followOffset.y,
+        };
+      },
+      getCrew: function () {
+        const people = [];
+        cfg().crewOrder.forEach(function (role) {
+          (runtime.crew[role] || []).forEach(function (agent) {
+            const anim = agent.body && agent.body.anims && agent.body.anims.currentAnim;
+            people.push({
+              role: role,
+              x: Math.round(agent.x),
+              y: Math.round(agent.y),
+              phase: agent.phase,
+              purpose: agent.purpose,
+              carry: agent.carry,
+              anim: anim ? anim.key : "",
+              flip: !!(agent.body && agent.body.flipX),
+              scaleY: agent.body ? Math.round(agent.body.scaleY * 100) / 100 : 0,
+            });
+          });
+        });
+        const state = runtime.state;
+        return {
+          jobs: runtime.jobs,
+          people: people,
+          hold: runtime.hudHold,
+          flies: runtime.flyQueue.length,
+          storage: state ? state.storage : null,
+          goods: state ? state.goods : null,
+          display: state ? state.display : null,
         };
       },
       getMotion: function () {

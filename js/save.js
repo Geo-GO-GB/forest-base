@@ -54,6 +54,7 @@
       progress: { helperMs: 0, workbenchMs: 0, customerMs: 0 },
       goods: root.Sim.emptyGoods(),
       display: root.Sim.emptyDisplay(),
+      crew: root.Sim.emptyCrew(),
       tutorialStep: 0,
       savedAt: 0,
     };
@@ -95,7 +96,22 @@
     state.buildings.box = !!(raw.buildings && raw.buildings.box);
     state.buildings.workbench = !!(raw.buildings && raw.buildings.workbench);
     state.buildings.desk = !!(raw.buildings && raw.buildings.desk);
-    state.helperHired = raw.helperHired === true;
+    state.crew = root.Sim.emptyCrew();
+    const savedCrew = raw.crew || {};
+    const crewOrder = cfg().crewOrder;
+    for (let i = 0; i < crewOrder.length; i += 1) {
+      const id = crewOrder[i];
+      const src = savedCrew[id] || {};
+      state.crew[id] = {
+        hired: src.hired === true,
+        speed: clampInt(src.speed, 0, 6),
+        carry: clampInt(src.carry, 0, 6),
+        haste: clampInt(src.haste, 0, 6),
+        n: clampInt(src.n, 0, 4),
+      };
+    }
+    if (raw.helperHired === true) state.crew.twig.hired = true;
+    state.helperHired = state.crew.twig.hired;
     state.discoveredMushroom = raw.discoveredMushroom === true || state.buildings.desk;
     const savedNodes = raw.nodes || {};
     const list = cfg().nodes;

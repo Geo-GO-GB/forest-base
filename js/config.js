@@ -143,8 +143,6 @@
       shop: { x: 760, y: 1524 },
     },
 
-    helperPath: { x1: 620, y1: 1468, x2: 680, y2: 1468 },
-
     /* manifest.json v5 の ingame。表示倍率はこの値のまま使う。 */
     art: {
       characters: 0.55,
@@ -195,11 +193,101 @@
     },
 
     helper: {
-      name: "木こり",
+      name: "枝拾いおじさん",
       hireCost: 8,
-      intervalMs: 2000,
       resource: "twig",
       amount: 1,
+    },
+
+    /* 仲間。speed / carry / actMs は強化の段。upgrades の costs は次の段のコイン。 */
+    crewOrder: ["twig", "pebble", "berry", "craft", "clerk"],
+    crew: {
+      twig: {
+        name: "枝拾いおじさん",
+        kind: "gather",
+        resource: "twig",
+        hireCost: 8,
+        tint: 0,
+        home: { x: 640, y: 1360 },
+        speed: [100, 130, 165],
+        carry: [3, 5, 8],
+        actMs: [620, 400, 250],
+        upgrades: {
+          speed: { name: "足が速い", costs: [8, 18] },
+          carry: { name: "たくさん持つ", costs: [10, 22] },
+          haste: { name: "拾うのが速い", costs: [8, 18] },
+          n: { name: "もう一人", costs: [16, 36] },
+        },
+      },
+      pebble: {
+        name: "石拾いさん",
+        kind: "gather",
+        resource: "pebble",
+        hireCost: 10,
+        tint: 0xc5d0d4,
+        home: { x: 560, y: 1340 },
+        speed: [96, 126, 160],
+        carry: [3, 5, 8],
+        actMs: [640, 420, 260],
+        upgrades: {
+          speed: { name: "足が速い", costs: [10, 22] },
+          carry: { name: "たくさん持つ", costs: [12, 26] },
+          haste: { name: "拾うのが速い", costs: [10, 22] },
+          n: { name: "もう一人", costs: [20, 42] },
+        },
+      },
+      berry: {
+        name: "木の実拾いさん",
+        kind: "gather",
+        resource: "berry",
+        hireCost: 14,
+        tint: 0xf0b4b0,
+        home: { x: 720, y: 1340 },
+        speed: [96, 126, 160],
+        carry: [2, 4, 6],
+        actMs: [640, 420, 260],
+        upgrades: {
+          speed: { name: "足が速い", costs: [12, 26] },
+          carry: { name: "たくさん持つ", costs: [14, 30] },
+          haste: { name: "拾うのが速い", costs: [12, 26] },
+          n: { name: "もう一人", costs: [24, 48] },
+        },
+      },
+      craft: {
+        name: "作業職人",
+        kind: "craft",
+        needs: "workbench",
+        hireCost: 22,
+        tint: 0xf0d59a,
+        home: { x: 700, y: 1420 },
+        stand: { x: 740, y: 1436 },
+        speed: [90, 120, 150],
+        carry: [1, 2, 3],
+        actMs: [880, 560, 340],
+        upgrades: {
+          speed: { name: "足が速い", costs: [12, 26] },
+          carry: { name: "まとめ作り", costs: [16, 34] },
+          haste: { name: "手が速い", costs: [14, 30] },
+          n: { name: "もう一人", costs: [28, 56] },
+        },
+      },
+      clerk: {
+        name: "店番",
+        kind: "clerk",
+        hireCost: 18,
+        tint: 0xd2c2f4,
+        home: { x: 800, y: 1560 },
+        stand: { x: 760, y: 1572 },
+        speed: [100, 130, 165],
+        carry: [1, 2, 3],
+        actMs: [520, 340, 220],
+        upgrades: {
+          speed: { name: "足が速い", costs: [12, 24] },
+          carry: { name: "多く飾る", costs: [14, 30] },
+          haste: { name: "置くのが速い", costs: [10, 22] },
+          n: { name: "もう一人", costs: [24, 48] },
+        },
+      },
     },
 
     workbench: {

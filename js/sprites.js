@@ -7,7 +7,7 @@
   const SPRITE_LIST = [
     { key: "player", name: "主人公（正面）", file: "player.png", width: 96, height: 128, displayW: 48, displayH: 64, anchorY: 0.85 },
     { key: "backpack", name: "小さなリュック", file: "backpack.png", width: 64, height: 80, displayW: 18, displayH: 22, anchorY: 0.5 },
-    { key: "helper", name: "木こり", file: "helper.png", width: 96, height: 128, displayW: 44, displayH: 60, anchorY: 0.85 },
+    { key: "helper", name: "枝拾いおじさん", file: "helper.png", width: 96, height: 128, displayW: 44, displayH: 60, anchorY: 0.85 },
     { key: "twig", name: "枝", file: "twig.png", width: 128, height: 64, displayW: 36, displayH: 18, anchorY: 0.5 },
     { key: "pebble", name: "小石", file: "pebble.png", width: 64, height: 64, displayW: 28, displayH: 22, anchorY: 0.5 },
     { key: "berry", name: "木の実", file: "berry.png", width: 64, height: 64, displayW: 28, displayH: 28, anchorY: 0.5 },
