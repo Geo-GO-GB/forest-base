@@ -714,18 +714,30 @@
     return c;
   }
 
+  function addSaw(scene, parent, onPicture) {
+    if (scene.textures.exists("saw")) {
+      const saw = scene.add.image(onPicture ? 6 : 0, onPicture ? -30 : -2, "saw");
+      saw.setOrigin(0.5, 1);
+      saw.setScale(0.3);
+      runtime.saw = saw;
+    } else {
+      runtime.saw = scene.add.rectangle(0, -4, 18, 6, 0xd7d3cb).setStrokeStyle(2, 0x3c2f26);
+    }
+    parent.add(runtime.saw);
+  }
+
   function drawBuildingArt(scene, id, parent) {
     if (id === "workbench" || id === "desk") {
       const art = placeScaled(scene, id, cfg().art.furniture, 1);
       if (art) {
         parent.add(art);
+        if (id === "workbench") addSaw(scene, parent, true);
         return;
       }
     }
     if (id === "workbench") {
       parent.add(scene.add.rectangle(0, 8, 42, 16, 0x6b4630).setStrokeStyle(3, 0x3c2f26));
-      runtime.saw = scene.add.rectangle(0, -4, 18, 6, 0xd7d3cb).setStrokeStyle(2, 0x3c2f26);
-      parent.add(runtime.saw);
+      addSaw(scene, parent, false);
     } else if (id === "desk") {
       parent.add(scene.add.rectangle(0, 8, 40, 16, 0x6a4a86).setStrokeStyle(3, 0x3c2f26));
       parent.add(scene.add.circle(0, -6, 6, 0xfff1a8).setStrokeStyle(2, 0x3c2f26));
@@ -756,12 +768,20 @@
     });
     const shop = cfg().slots.shop;
     const sign = scene.add.container(shop.x, shop.y);
-    const shopArt = placeScaled(scene, "shop", cfg().art.furniture, 1);
-    if (shopArt) {
-      sign.add(shopArt);
+    if (scene.textures.exists("stand")) {
+      const art = scene.add.image(0, 0, "stand");
+      art.setOrigin(0.5, 0.92);
+      art.setScale(0.6);
+      sign.add(art);
+      sign.add(markDodge(scene.add.text(-23, -56, "お店", fontStyle(13)).setOrigin(0.5)));
     } else {
-      sign.add(scene.add.rectangle(0, 12, 6, 28, 0x8a5a32));
-      sign.add(scene.add.rectangle(0, -6, 58, 28, 0xfff8ee).setStrokeStyle(3, 0x3c2f26));
+      const shopArt = placeScaled(scene, "shop", cfg().art.furniture, 1);
+      if (shopArt) {
+        sign.add(shopArt);
+      } else {
+        sign.add(scene.add.rectangle(0, 12, 6, 28, 0x8a5a32));
+        sign.add(scene.add.rectangle(0, -6, 58, 28, 0xfff8ee).setStrokeStyle(3, 0x3c2f26));
+      }
       sign.add(markDodge(scene.add.text(0, -6, "お店", fontStyle(14)).setOrigin(0.5)));
     }
     sign.setDepth(100 + shop.y);
@@ -770,28 +790,78 @@
     attachDisplay(scene, sign);
   }
 
+  /* 陳列台のくぼみ。origin (0.5, 0.92)・倍率 0.6 の台に対する位置。 */
+  function displaySlots(scene) {
+    if (scene.textures.exists("stand")) {
+      return [
+        { x: -16, y: -34 },
+        { x: 0, y: -31 },
+        { x: 16, y: -28 },
+      ];
+    }
+    const count = cfg().shop.displaySlots;
+    const slots = [];
+    for (let i = 0; i < count; i += 1) slots.push({ x: -30 + i * 30, y: -34 });
+    return slots;
+  }
+
+  function firstProductTexture(scene) {
+    const order = cfg().productOrder;
+    for (let i = 0; i < order.length; i += 1) {
+      if (scene.textures.exists(order[i])) return order[i];
+    }
+    return "";
+  }
+
   function attachDisplay(scene, sign) {
     runtime.displayTokens = [];
-    const slots = cfg().shop.displaySlots;
-    for (let i = 0; i < slots; i += 1) {
-      const token = scene.add.container(-30 + i * 30, -34);
-      token.add(scene.add.ellipse(0, 10, 16, 6, 0x1a2418, 0.28));
-      const body = scene.add.rectangle(0, 0, 16, 14, 0xffffff).setStrokeStyle(2, 0x3c2f26);
+    const slots = displaySlots(scene);
+    const count = Math.min(cfg().shop.displaySlots, slots.length);
+    const tex = firstProductTexture(scene);
+    for (let i = 0; i < count; i += 1) {
+      const pos = slots[i];
+      const token = scene.add.container(pos.x, pos.y);
+      const glow = scene.add.circle(0, -8, 8, 0xfff1a8, 0.45);
+      glow.setVisible(false);
+      scene.tweens.add({ targets: glow, alpha: 0.12, yoyo: true, repeat: -1, duration: 700 });
+      token.add(glow);
+      let icon = null;
+      if (tex) {
+        icon = scene.add.image(0, 0, tex);
+        icon.setOrigin(0.5, 1);
+        icon.setScale(0.25);
+        token.add(icon);
+      }
+      const body = scene.add.rectangle(0, -6, 16, 14, 0xffffff).setStrokeStyle(2, 0x3c2f26);
+      body.setVisible(!tex);
       token.add(body);
       token.setVisible(false);
       sign.add(token);
-      runtime.displayTokens.push({ root: token, body: body });
+      runtime.displayTokens.push({ root: token, body: body, icon: icon, glow: glow });
     }
     syncDisplay();
   }
 
   function syncDisplay() {
     const shown = (runtime.state && runtime.state.display) || [];
+    const scene = runtime.scene;
     runtime.displayTokens.forEach(function (token, index) {
       const id = shown[index];
       const def = id && cfg().products[id];
       token.root.setVisible(!!def);
-      if (def) token.body.setFillStyle(def.color, 1);
+      if (!def) return;
+      const has = !!(scene && id && scene.textures.exists(id));
+      if (token.icon && has) {
+        token.icon.setTexture(id);
+        token.icon.setVisible(true);
+        token.icon.setScale(0.25);
+        token.body.setVisible(false);
+      } else {
+        if (token.icon) token.icon.setVisible(false);
+        token.body.setVisible(true);
+        token.body.setFillStyle(def.color, 1);
+      }
+      if (token.glow) token.glow.setVisible(id === "lamp" && has);
     });
   }
 
@@ -799,12 +869,22 @@
     const scene = runtime.scene;
     if (!scene) return;
     floatText(x, y - 24, "+" + root.Format.count(amount));
-    const coin = scene.add.circle(x, y - 8, 7, 0xf0c36a).setStrokeStyle(2, 0x3c2f26).setDepth(6100);
+    let coin;
+    let base = 1;
+    if (scene.textures.exists("coin")) {
+      coin = scene.add.image(x, y - 8, "coin");
+      coin.setOrigin(0.5, 1);
+      coin.setScale(0.35);
+      base = 0.35;
+    } else {
+      coin = scene.add.circle(x, y - 8, 7, 0xf0c36a).setStrokeStyle(2, 0x3c2f26);
+    }
+    coin.setDepth(6100);
     scene.tweens.add({
       targets: coin,
       y: y - 42,
       alpha: 0,
-      scale: 1.35,
+      scale: base * 1.35,
       duration: 680,
       onComplete: function () {
         coin.destroy();
@@ -816,9 +896,8 @@
     if (runtime.visitor) return runtime.visitor;
     const c = scene.add.container(0, 0);
     c.add(scene.add.ellipse(0, 1, cfg().art.shadowW, cfg().art.shadowH, 0x1a2418, 0.28));
-    const body = makeActor(scene, "helper-idle", "helper");
+    const body = makeActor(scene, "customer-idle", actorStill("customer"));
     if (body) {
-      body.setTint(0x8ec8ea);
       runtime.visitorBody = body;
       c.add(body);
     } else {
@@ -860,7 +939,7 @@
     const prevY = visitor.y;
     visitor.setPosition(x, y);
     visitor.setDepth(100 + y + 1);
-    applyFacing(runtime.visitorBody, null, x - prevX, y - prevY, "helper");
+    applyFacing(runtime.visitorBody, null, x - prevX, y - prevY, "customer");
     if (u < 1) return;
     if (runtime.visitPhase === "in") {
       const sale = root.Sim.buyDisplayed(state);
@@ -878,6 +957,13 @@
     }
     visitor.setVisible(false);
     runtime.visitPhase = "none";
+  }
+
+  function actorStill(who) {
+    if (who === "twig") return "helper";
+    if (who === "pebble") return "pebble-actor";
+    if (who === "berry") return "berry-actor";
+    return who;
   }
 
   function makeActor(scene, sheetIdle, stillKey) {
@@ -1048,6 +1134,12 @@
       ["flower-pink-sway", "assets/anim/flower-pink_sway.png", 64, 64],
       ["flower-white-sway", "assets/anim/flower-white_sway.png", 64, 64],
     ];
+    ["twig", "pebble", "berry", "craft", "clerk", "customer"].forEach(function (who) {
+      sheets.push([who + "-walk-down", "assets/anim/" + who + "_walk_down.png", 128, 128]);
+      sheets.push([who + "-walk-up", "assets/anim/" + who + "_walk_up.png", 128, 128]);
+      sheets.push([who + "-walk-left", "assets/anim/" + who + "_walk_left.png", 128, 128]);
+      sheets.push([who + "-idle", "assets/anim/" + who + "_idle.png", 128, 128]);
+    });
     sheets.forEach(function (row) {
       scene.load.spritesheet(row[0], row[1], { frameWidth: row[2], frameHeight: row[3] });
     });
@@ -1059,7 +1151,7 @@
       if (!scene.textures.exists(key) || scene.anims.exists(key)) return;
       scene.anims.create({ key: key, frames: frames, frameRate: rate, repeat: -1 });
     }
-    ["player", "helper"].forEach(function (who) {
+    ["player", "helper", "twig", "pebble", "berry", "craft", "clerk", "customer"].forEach(function (who) {
       ["down", "up", "left"].forEach(function (dir) {
         const sheet = who + "-walk-" + dir;
         if (!scene.textures.exists(sheet)) return;
@@ -1346,12 +1438,11 @@
     const art = cfg().art;
     const container = scene.add.container(home.x, home.y);
     container.add(scene.add.ellipse(0, 1, art.shadowW, art.shadowH, 0x1a2418, 0.28));
-    const body = makeActor(scene, "helper-idle", "helper");
+    const body = makeActor(scene, role + "-idle", actorStill(role));
     if (!body) {
-      const blob = scene.add.ellipse(0, -10, 18, 24, spec.tint || 0x8a5a32);
+      const blob = scene.add.ellipse(0, -10, 18, 24, spec.tint || 0x8a5a32).setStrokeStyle(2, 0x3c2f26);
       container.add(blob);
     } else {
-      if (spec.tint) body.setTint(spec.tint);
       container.add(body);
     }
     let hold = null;
@@ -1538,8 +1629,15 @@
         if (!id) break;
         const made = root.Sim.craft(state, id);
         if (!made.ok) break;
-        const token = scene.add.rectangle(agent.x + i * 8, agent.y - 24, 12, 10, cfg().products[id].color);
-        token.setStrokeStyle(2, 0x3c2f26);
+        let token;
+        if (scene.textures.exists(id)) {
+          token = scene.add.image(agent.x + i * 10, agent.y - 28, id);
+          token.setOrigin(0.5, 1);
+          token.setScale(0.5);
+        } else {
+          token = scene.add.rectangle(agent.x + i * 8, agent.y - 24, 12, 10, cfg().products[id].color);
+          token.setStrokeStyle(2, 0x3c2f26);
+        }
         token.setDepth(7000);
         scene.tweens.add({
           targets: token,
@@ -1556,6 +1654,7 @@
       return;
     }
     if (agent.purpose !== "place") return;
+    if (agent.hold) agent.hold.setVisible(false);
     const places = stats.carry;
     for (let i = 0; i < places; i += 1) {
       if (!canPlaceAny(state)) break;
@@ -1625,11 +1724,40 @@
     return "歩いている";
   }
 
+  function carriedProduct(state) {
+    const order = cfg().productOrder;
+    for (let i = 0; i < order.length; i += 1) {
+      if ((state.goods[order[i]] || 0) > 0) return order[i];
+    }
+    return "";
+  }
+
+  function syncClerkHold(scene, agent) {
+    const spec = cfg().crew[agent.role];
+    if (!spec || spec.kind !== "clerk") return;
+    const id = agent.purpose === "place" && !agent.popped ? carriedProduct(runtime.state) : "";
+    if (!id || !scene.textures.exists(id)) {
+      if (agent.hold) agent.hold.setVisible(false);
+      return;
+    }
+    if (!agent.hold) {
+      agent.hold = scene.add.image(10, -22, id);
+      agent.hold.setOrigin(0.5, 1);
+      agent.root.add(agent.hold);
+    } else if (!agent.hold.texture || agent.hold.texture.key !== id) {
+      agent.hold.setTexture(id);
+    }
+    agent.hold.setPosition(10, -22);
+    agent.hold.setScale(0.5);
+    agent.hold.setVisible(true);
+  }
+
   function updateAgent(scene, agent, step, stats) {
     const spec = cfg().crew[agent.role];
+    syncClerkHold(scene, agent);
     if (agent.phase === "wait") {
       agent.waitMs += step;
-      if (agent.body) applyFacing(agent.body, null, 0, 0, "helper");
+      if (agent.body) applyFacing(agent.body, null, 0, 0, agent.role);
       if (agent.body) agent.body.setY(0);
       if (agent.waitMs < 280) return;
       agent.waitMs = 0;
@@ -1643,7 +1771,7 @@
         agent.body.setY(0);
         const base = cfg().art.characters;
         agent.body.setScale(base, base);
-        applyFacing(agent.body, null, moved.vx, moved.vy, "helper");
+        applyFacing(agent.body, null, moved.vx, moved.vy, agent.role);
       }
       if (moved.stuck) {
         agent.phase = "wait";
@@ -1667,7 +1795,7 @@
       const base = cfg().art.characters;
       const squat = 1 - bob * 0.34;
       agent.body.setScale(base * (1 + bob * 0.08), base * squat);
-      applyFacing(agent.body, null, 0, 0, "helper");
+      applyFacing(agent.body, null, 0, 0, agent.role);
     }
     if (!agent.popped && u >= 0.4) {
       agent.popped = true;
@@ -1894,6 +2022,7 @@
               anim: anim ? anim.key : "",
               flip: !!(agent.body && agent.body.flipX),
               scaleY: agent.body ? Math.round(agent.body.scaleY * 100) / 100 : 0,
+              hold: agent.hold && agent.hold.visible && agent.hold.texture ? agent.hold.texture.key : "",
             });
           });
         });

@@ -341,7 +341,7 @@ test("corrupt saves are quarantined and a newer version is not overwritten", fun
 test("sprite list is one entry per placeholder the game can swap", function () {
   const list = globalThis.SPRITE_LIST;
   const by = globalThis.SPRITE_BY_KEY;
-  assert.equal(list.length, 18);
+  assert.equal(list.length, 30);
   const seen = {};
   list.forEach(function (sprite) {
     assert.ok(!seen[sprite.key], "duplicate " + sprite.key);
@@ -359,6 +359,14 @@ test("sprite list is one entry per placeholder the game can swap", function () {
     assert.ok(game.includes('"' + key + '"'), key);
   });
   assert.equal(seen.plank, true);
+  ["pebble-actor", "berry-actor", "craft", "clerk", "customer", "tombo", "ame", "koma", "lamp", "coin", "saw", "stand"].forEach(function (key) {
+    assert.equal(seen[key], true, key);
+  });
+  assert.ok(!game.includes("setTint"), "crew and visitors use their own sprites");
+  assert.ok(game.includes('"customer"'));
+  assert.ok(game.includes('"stand"'));
+  assert.ok(game.includes('"saw"'));
+  assert.ok(game.includes('"coin"'));
   assert.ok(CFG.resourceOrder.indexOf("plank") >= 0);
   assert.ok(ui.includes("assets/"));
   assert.ok(game.includes('scene.load.image(sprite.key, "assets/" + sprite.file)'));

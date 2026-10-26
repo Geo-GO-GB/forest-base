@@ -512,7 +512,7 @@
   function buildPocket() {
     const pocket = $("pocket");
     if (!pocket || pocket.childElementCount) return;
-    let html = '<p class="pocket-row"><span class="coin-icon" aria-hidden="true"></span><b id="pocket-coins">0</b><span class="sr">コイン</span></p>';
+    let html = '<p class="pocket-row"><img class="coin-icon" alt="" src="assets/coin.png" /><b id="pocket-coins">0</b><span class="sr">コイン</span></p>';
     CFG().resourceOrder.forEach(function (id) {
       const resource = CFG().resources[id];
       html += '<p class="pocket-row">';
@@ -522,6 +522,15 @@
       html += "</p>";
     });
     pocket.innerHTML = html;
+    const coin = pocket.querySelector("img.coin-icon");
+    if (coin) {
+      coin.addEventListener("error", function () {
+        const fallback = document.createElement("span");
+        fallback.className = "coin-icon";
+        fallback.setAttribute("aria-hidden", "true");
+        coin.replaceWith(fallback);
+      });
+    }
   }
 
   function init(nextActions) {
