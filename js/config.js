@@ -210,16 +210,53 @@
       outputAmount: 1,
     },
 
+    /* 作業台で材料から作る品。price はお客さんが買うコイン。 */
+    products: {
+      tombo: {
+        name: "竹とんぼ",
+        price: 12,
+        cost: { twig: 1, plank: 1 },
+        color: 0x7dae4a,
+      },
+      ame: {
+        name: "木の実アメ",
+        price: 10,
+        cost: { berry: 2, twig: 1 },
+        color: 0xd4534a,
+      },
+      koma: {
+        name: "石のコマ",
+        price: 8,
+        cost: { pebble: 2, twig: 1 },
+        color: 0x8a9396,
+      },
+      lamp: {
+        name: "光るランプ",
+        price: 28,
+        cost: { mushroom: 1, plank: 1 },
+        color: 0x7a5cff,
+      },
+    },
+    productOrder: ["tombo", "ame", "koma", "lamp"],
+
+    shop: {
+      displaySlots: 3,
+      customerMs: 5000,
+    },
+
+    /* リュックの底の位置。0 が足元。小さいほど背中の下。 */
+    pack: { idleY: -8, downY: -8, upY: -6, sideY: -8, sideX: 7 },
+
     buildings: {
       box: {
         name: "木箱",
-        effect: "保管が増える",
+        effect: "秘密基地に置く木箱",
         coins: 4,
         cost: { twig: 3, pebble: 2 },
       },
       workbench: {
         name: "作業台",
-        effect: "枝を木材にする",
+        effect: "枝を木材にし、品物も作る",
         coins: 8,
         cost: { twig: 4, pebble: 2 },
       },

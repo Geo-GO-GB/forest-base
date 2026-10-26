@@ -24,6 +24,7 @@ function memoryStorage() {
 }
 
 load("js/config.js");
+load("js/format.js");
 load("js/layout.js");
 load("js/sim.js");
 load("js/save.js");
@@ -31,6 +32,7 @@ load("js/sprites.js");
 
 const CFG = globalThis.GAME_CONFIG;
 const Sim = globalThis.Sim;
+const Format = globalThis.Format;
 const Save = globalThis.Save;
 globalThis.localStorage = memoryStorage();
 
@@ -103,16 +105,21 @@ test("special mushrooms are not auto-collected", function () {
   assert.equal(Sim.collect(state, "mushroom-2", true).discovered, false);
 });
 
-test("common resources fill the carry and then stop", function () {
+test("common resources have no carry or storage cap", function () {
   const state = fresh();
   const twigs = CFG.nodes.filter(function (node) {
     return node.type === "twig";
   });
   for (let i = 0; i < twigs.length; i += 1) {
-    Sim.collect(state, twigs[i].id, false);
+    assert.equal(Sim.collect(state, twigs[i].id, false).ok, true);
   }
-  assert.equal(Sim.bagCount(state.carry), CFG.baseCarry);
-  assert.equal(state.carry.twig, CFG.baseCarry);
+  assert.equal(state.carry.twig, twigs.length);
+  state.carry.twig = 5000;
+  const deposited = Sim.deposit(state);
+  assert.equal(deposited.moved, 5000);
+  assert.equal(deposited.blocked, false);
+  assert.equal(state.carry.twig, 0);
+  assert.equal(state.storage.twig, 5000);
 });
 
 test("deposit, sell, backpack, build, and hire", function () {
@@ -131,10 +138,9 @@ test("deposit, sell, backpack, build, and hire", function () {
   assert.equal(state.storage.twig, 5);
   state.coins = 30;
   assert.equal(Sim.buyBackpack(state).ok, true);
-  assert.equal(Sim.carryCap(state), CFG.backpackCarry);
+  assert.equal(state.backpack, true);
   assert.equal(Sim.buyBackpack(state).reason, "owned");
   assert.equal(Sim.build(state, "box").ok, true);
-  assert.equal(Sim.storageCap(state), CFG.baseStorage + CFG.boxStorageBonus);
   assert.equal(Sim.build(state, "desk").reason, "locked");
   state.discoveredMushroom = true;
   state.carry.mushroom = 1;
@@ -159,17 +165,13 @@ test("workbench stops without twigs, then crafts", function () {
   assert.equal(result.workbench, "run");
 });
 
-test("helper fills storage and then stops", function () {
+test("helper keeps gathering without a storage cap", function () {
   const state = fresh();
   state.helperHired = true;
-  state.storage.twig = CFG.baseStorage;
-  const blocked = Sim.tickProduction(state, 16);
-  assert.equal(blocked.helper, "full");
-  assert.equal(state.storage.twig, CFG.baseStorage);
-  state.storage.twig = 0;
+  state.storage.twig = 100;
   const frames = Math.ceil(CFG.helper.intervalMs / 16);
   for (let i = 0; i < frames; i += 1) Sim.tickProduction(state, 16);
-  assert.equal(state.storage.twig, CFG.helper.amount);
+  assert.equal(state.storage.twig, 100 + CFG.helper.amount);
 });
 
 test("a huge delta does not grant offline production", function () {
@@ -196,6 +198,50 @@ test("zero delta does not finish a craft", function () {
   assert.equal(state.progress.helperMs, CFG.helper.intervalMs - 1);
 });
 
+test("counts use short suffixes and drop a trailing zero", function () {
+  assert.equal(Format.count(0), "0");
+  assert.equal(Format.count(999), "999");
+  assert.equal(Format.count(1000), "1k");
+  assert.equal(Format.count(1200), "1.2k");
+  assert.equal(Format.count(1999), "2k");
+  assert.equal(Format.count(3400000), "3.4M");
+  assert.equal(Format.count(5600000000), "5.6G");
+  assert.equal(Format.count(7800000000000), "7.8T");
+  assert.equal(Format.count(7800000000000000), "7.8P");
+});
+
+test("workbench products can be displayed and sold to a visitor", function () {
+  const state = fresh();
+  assert.equal(Sim.craft(state, "tombo").reason, "need-bench");
+  state.buildings.workbench = true;
+  state.storage.twig = 3;
+  state.storage.plank = 2;
+  state.storage.berry = 2;
+  assert.equal(Sim.craft(state, "tombo").ok, true);
+  assert.equal(state.goods.tombo, 1);
+  assert.equal(state.storage.twig, 2);
+  assert.equal(state.storage.plank, 1);
+  assert.equal(Sim.craft(state, "ame").ok, true);
+  assert.equal(Sim.displayProduct(state, "tombo").ok, true);
+  assert.equal(state.goods.tombo, 0);
+  assert.equal(state.display[0], "tombo");
+  assert.equal(Sim.displayProduct(state, "ame").index, 1);
+  state.display[2] = "tombo";
+  state.goods.koma = 1;
+  assert.equal(Sim.displayProduct(state, "koma").reason, "display-full");
+  state.progress.customerMs = CFG.shop.customerMs - 10;
+  assert.equal(Sim.customerDue(state, 16), true);
+  const sale = Sim.buyDisplayed(state);
+  assert.equal(sale.id, "tombo");
+  assert.equal(sale.gained, CFG.products.tombo.price);
+  assert.equal(state.coins, CFG.products.tombo.price);
+  assert.equal(state.display[0], "");
+  state.progress.customerMs = 0;
+  Sim.customerDue(state, 24 * 60 * 60 * 1000);
+  assert.ok(state.progress.customerMs <= CFG.maxFrameMs);
+  assert.equal(state.coins, CFG.products.tombo.price);
+});
+
 test("save roundtrip keeps progress and ignores an old timestamp", function () {
   globalThis.localStorage = memoryStorage();
   const state = Save.load().state;
@@ -207,6 +253,11 @@ test("save roundtrip keeps progress and ignores an old timestamp", function () {
   state.discoveredMushroom = true;
   state.storage.twig = 3;
   state.carry.berry = 1;
+  state.coins = 7800000000000;
+  state.carry.twig = 1200;
+  state.goods.tombo = 2;
+  state.display[0] = "ame";
+  state.progress.customerMs = 40;
   state.progress.helperMs = CFG.helper.intervalMs - 10;
   state.nodes["twig-1"].depleted = true;
   state.nodes["twig-1"].respawnMs = 1234;
@@ -214,10 +265,14 @@ test("save roundtrip keeps progress and ignores an old timestamp", function () {
   assert.equal(Save.save(state).ok, true);
   const loaded = Save.load();
   assert.equal(loaded.warning, "");
-  assert.equal(loaded.state.coins, 12);
+  assert.equal(loaded.state.coins, 7800000000000);
+  assert.equal(loaded.state.carry.twig, 1200);
   assert.equal(loaded.state.player.x, 700);
   assert.equal(loaded.state.storage.twig, 3);
   assert.equal(loaded.state.carry.berry, 1);
+  assert.equal(loaded.state.goods.tombo, 2);
+  assert.equal(loaded.state.display[0], "ame");
+  assert.equal(loaded.state.progress.customerMs, 40);
   assert.equal(loaded.state.progress.helperMs, CFG.helper.intervalMs - 10);
   assert.equal(loaded.state.nodes["twig-1"].depleted, true);
   assert.equal(loaded.state.nodes["twig-1"].respawnMs, 1234);

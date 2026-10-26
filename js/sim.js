@@ -41,9 +41,6 @@
     if (resource.special && !manual) return { ok: false, reason: "manual" };
     const amount = resource.gatherAmount;
     if (!(amount > 0)) return { ok: false, reason: "empty" };
-    if (bagCount(state.carry) + amount > carryCap(state)) {
-      return { ok: false, reason: "carry-full" };
-    }
     state.carry[node.type] += amount;
     record.depleted = true;
     record.respawnMs = resource.respawnMs;
@@ -57,18 +54,16 @@
 
   function deposit(state) {
     let moved = 0;
-    const cap = storageCap(state);
     const order = cfg().resourceOrder;
     for (let i = 0; i < order.length; i += 1) {
       const id = order[i];
-      while (state.carry[id] > 0 && bagCount(state.storage) < cap) {
-        state.carry[id] -= 1;
-        state.storage[id] += 1;
-        moved += 1;
-      }
+      const n = state.carry[id] || 0;
+      if (n <= 0) continue;
+      state.storage[id] = (state.storage[id] || 0) + n;
+      state.carry[id] = 0;
+      moved += n;
     }
-    const blocked = bagCount(state.carry) > 0;
-    return { ok: moved > 0, moved: moved, blocked: blocked, reason: blocked ? "storage-full" : "" };
+    return { ok: moved > 0, moved: moved, blocked: false, reason: "" };
   }
 
   function sell(state, id, all) {
@@ -179,15 +174,12 @@
   function tickHelper(state, step) {
     const helper = cfg().helper;
     if (!state.helperHired) return { status: "off", produced: 0 };
-    if (bagCount(state.storage) + helper.amount > storageCap(state)) {
-      return { status: "full", produced: 0 };
-    }
     return runCycle(state, step, {
       intervalMs: helper.intervalMs,
       progressKey: "helperMs",
       outputAmount: helper.amount,
       blocked: function () {
-        return bagCount(state.storage) + helper.amount > storageCap(state) ? "full" : "";
+        return "";
       },
       apply: function () {
         state.storage[helper.resource] += helper.amount;
@@ -201,22 +193,110 @@
     if ((state.storage[work.input] || 0) < work.inputAmount) {
       return { status: "no-input", produced: 0 };
     }
-    const projected = bagCount(state.storage) - work.inputAmount + work.outputAmount;
-    if (projected > storageCap(state)) return { status: "full", produced: 0 };
     return runCycle(state, step, {
       intervalMs: work.intervalMs,
       progressKey: "workbenchMs",
       outputAmount: work.outputAmount,
       blocked: function () {
         if ((state.storage[work.input] || 0) < work.inputAmount) return "no-input";
-        const next = bagCount(state.storage) - work.inputAmount + work.outputAmount;
-        return next > storageCap(state) ? "full" : "";
+        return "";
       },
       apply: function () {
         state.storage[work.input] -= work.inputAmount;
         state.storage[work.output] += work.outputAmount;
       },
     });
+  }
+
+  function emptyGoods() {
+    const goods = {};
+    const order = cfg().productOrder;
+    for (let i = 0; i < order.length; i += 1) goods[order[i]] = 0;
+    return goods;
+  }
+
+  function emptyDisplay() {
+    const slots = [];
+    const count = cfg().shop.displaySlots;
+    for (let i = 0; i < count; i += 1) slots.push("");
+    return slots;
+  }
+
+  function canCraft(state, productId) {
+    const def = cfg().products[productId];
+    if (!def) return { ok: false, reason: "missing" };
+    if (!state.buildings.workbench) return { ok: false, reason: "need-bench" };
+    const ids = Object.keys(def.cost);
+    for (let i = 0; i < ids.length; i += 1) {
+      if (haveTotal(state, ids[i]) < def.cost[ids[i]]) return { ok: false, reason: "no-materials" };
+    }
+    return { ok: true };
+  }
+
+  function craft(state, productId) {
+    const check = canCraft(state, productId);
+    if (!check.ok) return check;
+    const def = cfg().products[productId];
+    const ids = Object.keys(def.cost);
+    for (let i = 0; i < ids.length; i += 1) {
+      if (!spend(state, ids[i], def.cost[ids[i]])) return { ok: false, reason: "no-materials" };
+    }
+    if (!state.goods) state.goods = emptyGoods();
+    state.goods[productId] = (state.goods[productId] || 0) + 1;
+    return { ok: true, id: productId };
+  }
+
+  function displayProduct(state, productId) {
+    const def = cfg().products[productId];
+    if (!def) return { ok: false, reason: "missing" };
+    if (!state.goods || !(state.goods[productId] > 0)) return { ok: false, reason: "empty" };
+    if (!state.display) state.display = emptyDisplay();
+    let index = -1;
+    for (let i = 0; i < state.display.length; i += 1) {
+      if (!state.display[i]) {
+        index = i;
+        break;
+      }
+    }
+    if (index < 0) return { ok: false, reason: "display-full" };
+    state.goods[productId] -= 1;
+    state.display[index] = productId;
+    return { ok: true, id: productId, index: index };
+  }
+
+  function hasDisplay(state) {
+    const slots = state.display || [];
+    for (let i = 0; i < slots.length; i += 1) {
+      if (slots[i]) return true;
+    }
+    return false;
+  }
+
+  function customerDue(state, dtMs) {
+    const step = clampStep(dtMs);
+    if (!state.progress) state.progress = {};
+    if (!hasDisplay(state)) {
+      state.progress.customerMs = 0;
+      return false;
+    }
+    if (step <= 0) return false;
+    state.progress.customerMs = (state.progress.customerMs || 0) + step;
+    if (state.progress.customerMs < cfg().shop.customerMs) return false;
+    state.progress.customerMs -= cfg().shop.customerMs;
+    return true;
+  }
+
+  function buyDisplayed(state) {
+    if (!state.display) state.display = emptyDisplay();
+    for (let i = 0; i < state.display.length; i += 1) {
+      const id = state.display[i];
+      const def = id && cfg().products[id];
+      if (!def) continue;
+      state.display[i] = "";
+      state.coins += def.price;
+      return { ok: true, id: id, gained: def.price, index: i };
+    }
+    return { ok: false, reason: "empty" };
   }
 
   function tickProduction(state, dtMs) {
@@ -262,5 +342,12 @@
     hire: hire,
     tickProduction: tickProduction,
     tickRespawn: tickRespawn,
+    canCraft: canCraft,
+    craft: craft,
+    displayProduct: displayProduct,
+    customerDue: customerDue,
+    buyDisplayed: buyDisplayed,
+    emptyGoods: emptyGoods,
+    emptyDisplay: emptyDisplay,
   };
 })(globalThis);

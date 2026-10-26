@@ -51,11 +51,15 @@
       helperHired: false,
       discoveredMushroom: false,
       nodes: defaultNodes(),
-      progress: { helperMs: 0, workbenchMs: 0 },
+      progress: { helperMs: 0, workbenchMs: 0, customerMs: 0 },
+      goods: root.Sim.emptyGoods(),
+      display: root.Sim.emptyDisplay(),
       tutorialStep: 0,
       savedAt: 0,
     };
   }
+
+  const BIG = 9007199254740991;
 
   function clampInt(value, min, max) {
     const number = Number(value);
@@ -70,12 +74,22 @@
       state.player.x = Math.max(world.pad, Math.min(world.width - world.pad, Number(raw.player.x)));
       state.player.y = Math.max(world.pad, Math.min(world.height - world.pad, Number(raw.player.y)));
     }
-    state.coins = clampInt(raw.coins, 0, 999999);
+    state.coins = clampInt(raw.coins, 0, BIG);
     const order = cfg().resourceOrder;
     for (let i = 0; i < order.length; i += 1) {
       const id = order[i];
-      state.carry[id] = clampInt(raw.carry && raw.carry[id], 0, 9999);
-      state.storage[id] = clampInt(raw.storage && raw.storage[id], 0, 9999);
+      state.carry[id] = clampInt(raw.carry && raw.carry[id], 0, BIG);
+      state.storage[id] = clampInt(raw.storage && raw.storage[id], 0, BIG);
+    }
+    const goods = raw.goods || {};
+    const products = cfg().productOrder;
+    for (let i = 0; i < products.length; i += 1) {
+      state.goods[products[i]] = clampInt(goods[products[i]], 0, BIG);
+    }
+    const shown = Array.isArray(raw.display) ? raw.display : [];
+    for (let i = 0; i < state.display.length; i += 1) {
+      const id = shown[i];
+      state.display[i] = cfg().products[id] ? id : "";
     }
     state.backpack = raw.backpack === true;
     state.buildings.box = !!(raw.buildings && raw.buildings.box);
@@ -96,6 +110,7 @@
     const progress = raw.progress || {};
     state.progress.helperMs = clampInt(progress.helperMs, 0, 600000);
     state.progress.workbenchMs = clampInt(progress.workbenchMs, 0, 600000);
+    state.progress.customerMs = clampInt(progress.customerMs, 0, 600000);
     state.tutorialStep = clampInt(raw.tutorialStep, 0, 20);
     state.savedAt = clampInt(raw.savedAt, 0, 9000000000000000);
     return state;

@@ -17,6 +17,8 @@
     "carry-full": "持ちきれない。秘密基地に戻るか、リュックを買おう",
     "storage-full": "保管がいっぱい。売ると空きができる",
     "no-coins": "コインが足りない",
+    "need-bench": "作業台を建てると作れる",
+    "display-full": "飾る場所がいっぱい",
     "no-materials": "材料が足りない",
     locked: "まだ見つけていない",
     owned: "もう持っている",
@@ -54,6 +56,14 @@
     helperBody: null,
     colliders: [],
     packFront: false,
+    shopSign: null,
+    displayTokens: [],
+    visitor: null,
+    visitorBody: null,
+    visitPhase: "none",
+    visitFrom: null,
+    visitTo: null,
+    visitT: 0,
   };
 
   function cfg() {
@@ -179,7 +189,13 @@
     const toastHost = document.getElementById("toasts");
     const toastBox = toastHost && toastHost.childElementCount ? uiRect(toastHost) : null;
     const banner = unionRect([uiRect(document.getElementById("hud")), toastBox].filter(Boolean));
-    const obstacles = [banner, uiRect(document.getElementById("stick")), uiRect(document.getElementById("action-btn")), unionRect(buttons)].filter(Boolean);
+    const obstacles = [
+      banner,
+      uiRect(document.getElementById("pocket")),
+      uiRect(document.getElementById("stick")),
+      uiRect(document.getElementById("action-btn")),
+      unionRect(buttons),
+    ].filter(Boolean);
     const cam = runtime.scene.cameras.main;
     const view = { w: cam.width, h: cam.height, zoom: cam.zoom };
     runtime.dodge.forEach(function (text) {
@@ -313,7 +329,7 @@
       return;
     }
     reachTutorial(4);
-    root.UI.toast(cfg().resources[id].name + "を売って、" + result.gained + "コイン");
+    root.UI.toast(cfg().resources[id].name + "を売って、" + root.Format.count(result.gained) + "コイン");
     doSave(false);
   }
 
@@ -353,7 +369,32 @@
       return;
     }
     if (runtime.pack) runtime.pack.setVisible(true);
-    root.UI.toast("小さなリュックを買った。持ち物が増えた");
+    root.UI.toast("小さなリュックを買った。背中に背負う");
+    doSave(false);
+  }
+
+  function onCraft(id) {
+    if (!runtime.state || !ensureBase()) return;
+    const result = root.Sim.craft(runtime.state, id);
+    if (!result.ok) {
+      toastReason(result.reason);
+      runtime.forceUi = true;
+      return;
+    }
+    root.UI.toast(cfg().products[id].name + "を作った");
+    doSave(false);
+  }
+
+  function onShow(id) {
+    if (!runtime.state || !ensureBase()) return;
+    const result = root.Sim.displayProduct(runtime.state, id);
+    if (!result.ok) {
+      toastReason(result.reason);
+      runtime.forceUi = true;
+      return;
+    }
+    syncDisplay();
+    root.UI.toast(cfg().products[id].name + "を飾った");
     doSave(false);
   }
 
@@ -706,6 +747,118 @@
     }
     sign.setDepth(100 + shop.y);
     addCircleCollider(shop.x, shop.y, 24);
+    runtime.shopSign = sign;
+    attachDisplay(scene, sign);
+  }
+
+  function attachDisplay(scene, sign) {
+    runtime.displayTokens = [];
+    const slots = cfg().shop.displaySlots;
+    for (let i = 0; i < slots; i += 1) {
+      const token = scene.add.container(-30 + i * 30, -34);
+      token.add(scene.add.ellipse(0, 10, 16, 6, 0x1a2418, 0.28));
+      const body = scene.add.rectangle(0, 0, 16, 14, 0xffffff).setStrokeStyle(2, 0x3c2f26);
+      token.add(body);
+      token.setVisible(false);
+      sign.add(token);
+      runtime.displayTokens.push({ root: token, body: body });
+    }
+    syncDisplay();
+  }
+
+  function syncDisplay() {
+    const shown = (runtime.state && runtime.state.display) || [];
+    runtime.displayTokens.forEach(function (token, index) {
+      const id = shown[index];
+      const def = id && cfg().products[id];
+      token.root.setVisible(!!def);
+      if (def) token.body.setFillStyle(def.color, 1);
+    });
+  }
+
+  function coinPop(x, y, amount) {
+    const scene = runtime.scene;
+    if (!scene) return;
+    floatText(x, y - 24, "+" + root.Format.count(amount));
+    const coin = scene.add.circle(x, y - 8, 7, 0xf0c36a).setStrokeStyle(2, 0x3c2f26).setDepth(6100);
+    scene.tweens.add({
+      targets: coin,
+      y: y - 42,
+      alpha: 0,
+      scale: 1.35,
+      duration: 680,
+      onComplete: function () {
+        coin.destroy();
+      },
+    });
+  }
+
+  function ensureVisitor(scene) {
+    if (runtime.visitor) return runtime.visitor;
+    const c = scene.add.container(0, 0);
+    c.add(scene.add.ellipse(0, 1, cfg().art.shadowW, cfg().art.shadowH, 0x1a2418, 0.28));
+    const body = makeActor(scene, "helper-idle", "helper");
+    if (body) {
+      body.setTint(0x8ec8ea);
+      runtime.visitorBody = body;
+      c.add(body);
+    } else {
+      c.add(scene.add.ellipse(0, -16, 22, 28, 0x8ec8ea).setStrokeStyle(2, 0x3c2f26));
+      c.add(scene.add.circle(0, -32, 10, 0xf3c7a5).setStrokeStyle(2, 0x3c2f26));
+    }
+    c.setVisible(false);
+    runtime.visitor = c;
+    return c;
+  }
+
+  function updateVisitor(scene, step) {
+    const state = runtime.state;
+    const shop = cfg().slots.shop;
+    const stand = { x: shop.x - 6, y: shop.y + 48 };
+    const home = { x: Math.min(cfg().world.width - cfg().world.pad, shop.x + 150), y: shop.y + 86 };
+    if (runtime.visitPhase === "none") {
+      if (!root.Sim.customerDue(state, step)) return;
+      runtime.visitPhase = "in";
+      runtime.visitFrom = home;
+      runtime.visitTo = stand;
+      runtime.visitT = 0;
+      const visitor = ensureVisitor(scene);
+      visitor.setPosition(home.x, home.y);
+      visitor.setVisible(true);
+      visitor.setDepth(100 + home.y);
+      return;
+    }
+    const from = runtime.visitFrom;
+    const to = runtime.visitTo;
+    const dist = Math.hypot(to.x - from.x, to.y - from.y);
+    const duration = Math.max(360, (dist / cfg().playerSpeed) * 1000);
+    runtime.visitT += step;
+    const u = Math.min(1, runtime.visitT / duration);
+    const x = from.x + (to.x - from.x) * u;
+    const y = from.y + (to.y - from.y) * u;
+    const visitor = runtime.visitor;
+    const prevX = visitor.x;
+    const prevY = visitor.y;
+    visitor.setPosition(x, y);
+    visitor.setDepth(100 + y + 1);
+    applyFacing(runtime.visitorBody, null, x - prevX, y - prevY, "helper");
+    if (u < 1) return;
+    if (runtime.visitPhase === "in") {
+      const sale = root.Sim.buyDisplayed(state);
+      if (sale.ok) {
+        coinPop(x, y, sale.gained);
+        syncDisplay();
+        runtime.forceUi = true;
+        doSave(false);
+      }
+      runtime.visitPhase = "out";
+      runtime.visitFrom = { x: x, y: y };
+      runtime.visitTo = home;
+      runtime.visitT = 0;
+      return;
+    }
+    visitor.setVisible(false);
+    runtime.visitPhase = "none";
   }
 
   function makeActor(scene, sheetIdle, stillKey) {
@@ -729,23 +882,24 @@
   function applyFacing(sprite, pack, vx, vy, who) {
     if (!sprite || !sprite.anims) return;
     const moving = Math.hypot(vx, vy) > 0.04;
+    const worn = cfg().pack;
     let anim = who + "-idle";
     let flip = false;
     let packX = 0;
-    let packY = -34;
+    let packY = worn.idleY;
     let packFront = false;
     if (moving && Math.abs(vx) > Math.abs(vy)) {
       anim = who + "-walk-left";
       flip = vx > 0;
-      packX = flip ? -10 : 10;
-      packY = -30;
+      packX = flip ? -worn.sideX : worn.sideX;
+      packY = worn.sideY;
     } else if (moving && vy < 0) {
       anim = who + "-walk-up";
-      packY = -18;
+      packY = worn.upY;
       packFront = true;
     } else if (moving) {
       anim = who + "-walk-down";
-      packY = -34;
+      packY = worn.downY;
     }
     if (sprite.scene && sprite.scene.anims.exists(anim)) {
       const current = sprite.anims.currentAnim;
@@ -781,7 +935,7 @@
     }
     const packArt = placeScaled(scene, "backpack", art.pickups.backpack, 1);
     if (packArt) {
-      packArt.setPosition(0, -34);
+      packArt.setPosition(0, cfg().pack.idleY);
       runtime.pack = packArt;
     } else {
       runtime.pack = scene.add.rectangle(-14, 6, 12, 16, 0x8a5a32).setStrokeStyle(2, 0x3c2f26);
@@ -1102,6 +1256,8 @@
     updateProduction(step, time);
     syncNodes();
     updateHelper(step);
+    updateVisitor(scene, step);
+    syncDisplay();
     dodgeLabels();
     if (runtime.pack) runtime.pack.setVisible(runtime.state.backpack);
     const near = nearestMushroom();
@@ -1172,6 +1328,8 @@
       onBuild: onBuild,
       onHire: onHire,
       onBuy: onBuy,
+      onCraft: onCraft,
+      onShow: onShow,
       onAction: onAction,
       onSave: function () {
         doSave(true);

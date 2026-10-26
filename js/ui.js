@@ -33,9 +33,13 @@
     return Number.isInteger(value) ? String(value) : value.toFixed(1);
   }
 
+  function fmt(n) {
+    return root.Format ? root.Format.count(n) : String(n);
+  }
+
   function costLine(def) {
     const parts = [];
-    if (def.coins) parts.push("コイン " + def.coins);
+    if (def.coins) parts.push("コイン " + fmt(def.coins));
     const ids = Object.keys(def.cost);
     for (let i = 0; i < ids.length; i += 1) {
       const id = ids[i];
@@ -69,7 +73,7 @@
         html += '<span class="note">' + resource.blurb + "</span>";
       } else {
         html += "<span>保管 <b data-count='storage." + id + "'>0</b> / 所持 <b data-count='carry." + id + "'>0</b></span>";
-        html += "<span class='note'>" + resource.sellPrice + "コイン</span>";
+        html += "<span class='note'>" + fmt(resource.sellPrice) + "コイン</span>";
         html += '<button type="button" data-sell="' + id + '">1つ</button>';
         html += '<button type="button" data-sell-all="' + id + '">全部</button>';
       }
@@ -96,13 +100,9 @@
       "<h3>" +
       cfg.backpackName +
       "</h3>" +
-      "<p>持ち物 " +
-      cfg.baseCarry +
-      " → " +
-      cfg.backpackCarry +
-      "</p>" +
+      "<p>背負うと、背中にリュックがつく。</p>" +
       "<p>コイン " +
-      cfg.backpackCost +
+      fmt(cfg.backpackCost) +
       "</p>" +
       '<button type="button" data-buy="backpack">買う</button>' +
       '<p class="note" data-buy-note></p>' +
@@ -117,10 +117,7 @@
     for (let i = 0; i < cfg.buildingOrder.length; i += 1) {
       const id = cfg.buildingOrder[i];
       const def = cfg.buildings[id];
-      let effect = def.effect;
-      if (id === "box") {
-        effect += "（保管 " + cfg.baseStorage + " → " + (cfg.baseStorage + cfg.boxStorageBonus) + "）";
-      }
+      const effect = def.effect;
       html += '<section class="offer">';
       html += "<h3>" + def.name + "</h3>";
       html += "<p>" + effect + "</p>";
@@ -162,7 +159,7 @@
       cfg.helper.amount +
       "個、保管へ。</p>" +
       "<p>コイン " +
-      cfg.helper.hireCost +
+      fmt(cfg.helper.hireCost) +
       "</p>" +
       '<button type="button" data-hire>雇う</button>' +
       '<p class="note" data-hire-note></p>' +
@@ -186,8 +183,41 @@
       '<p data-status="workbench"></p>' +
       '<p class="note" data-remedy="workbench"></p>' +
       '<div class="bar" data-bar-wrap="workbench"><div data-bar="workbench"></div></div>' +
-      "</section>"
+      "</section>" +
+      renderCraft()
     );
+  }
+
+  function productCost(def) {
+    const ids = Object.keys(def.cost);
+    const parts = [];
+    for (let i = 0; i < ids.length; i += 1) {
+      parts.push(CFG().resources[ids[i]].name + " " + fmt(def.cost[ids[i]]));
+    }
+    return parts.join("、");
+  }
+
+  function renderCraft() {
+    const cfg = CFG();
+    let html = '<section class="offer">';
+    html += "<h3>品物を作る</h3>";
+    html += "<p>作業台で材料を使い、お店の台に飾る。お客さんが買うとコインになる。</p>";
+    for (let i = 0; i < cfg.productOrder.length; i += 1) {
+      const id = cfg.productOrder[i];
+      const def = cfg.products[id];
+      html += '<div class="row">';
+      html += '<span class="name">' + def.name + "</span>";
+      html += "<span>" + productCost(def) + "</span>";
+      html += "<span>売り " + fmt(def.price) + "</span>";
+      html += "<span>在庫 <b data-goods='" + id + "'>0</b></span>";
+      html += '<button type="button" data-craft="' + id + '">作る</button>';
+      html += '<button type="button" data-show="' + id + '">飾る</button>';
+      html += "</div>";
+    }
+    html += '<p data-display-line>飾り: なし</p>';
+    html += '<p class="note" data-craft-note></p>';
+    html += "</section>";
+    return html;
   }
 
   function renderSettings(loaded) {
@@ -258,11 +288,12 @@
     if (!state) return;
     lastState = state;
     lastExtra = extra || lastExtra || { inBase: false, statuses: { helper: "off", workbench: "off" }, nearMushroom: false };
-    const carry = root.Sim.bagCount(state.carry);
-    const storage = root.Sim.bagCount(state.storage);
-    $("coins").textContent = "コイン " + state.coins;
-    $("carry-label").textContent = "所持 " + carry + "/" + root.Sim.carryCap(state);
-    $("storage-label").textContent = "保管 " + storage + "/" + root.Sim.storageCap(state);
+    const pocketCoins = $("pocket-coins");
+    if (pocketCoins) pocketCoins.textContent = fmt(state.coins);
+    CFG().resourceOrder.forEach(function (id) {
+      const el = document.querySelector("[data-pocket='" + id + "']");
+      if (el) el.textContent = fmt(root.Sim.haveTotal(state, id));
+    });
     $("save-label").textContent = state.savedAt ? "保存 " + formatTime(state.savedAt) : "未保存";
     const statuses = lastExtra.statuses || { helper: "off", workbench: "off" };
     const inputName = CFG().resources[CFG().workbench.input].name;
@@ -286,23 +317,50 @@
     if (summary) {
       summary.textContent =
         "コイン " +
-        state.coins +
+        fmt(state.coins) +
         "　所持 " +
-        root.Sim.bagCount(state.carry) +
-        "/" +
-        root.Sim.carryCap(state) +
+        fmt(root.Sim.bagCount(state.carry)) +
         "　保管 " +
-        root.Sim.bagCount(state.storage) +
-        "/" +
-        root.Sim.storageCap(state);
+        fmt(root.Sim.bagCount(state.storage));
     }
     body.querySelectorAll("[data-count]").forEach(function (el) {
       const parts = el.dataset.count.split(".");
-      el.textContent = String((state[parts[0]] && state[parts[0]][parts[1]]) || 0);
+      el.textContent = fmt((state[parts[0]] && state[parts[0]][parts[1]]) || 0);
     });
     body.querySelectorAll("[data-have]").forEach(function (el) {
-      el.textContent = String(root.Sim.haveTotal(state, el.dataset.have));
+      el.textContent = fmt(root.Sim.haveTotal(state, el.dataset.have));
     });
+    body.querySelectorAll("[data-goods]").forEach(function (el) {
+      el.textContent = fmt((state.goods && state.goods[el.dataset.goods]) || 0);
+    });
+    const displayLine = body.querySelector("[data-display-line]");
+    if (displayLine) {
+      const names = [];
+      const shown = state.display || [];
+      for (let i = 0; i < shown.length; i += 1) {
+        const def = shown[i] && CFG().products[shown[i]];
+        if (def) names.push(def.name);
+      }
+      displayLine.textContent = names.length ? "飾り: " + names.join("、") : "飾り: なし";
+    }
+    body.querySelectorAll("[data-craft]").forEach(function (button) {
+      const check = root.Sim.canCraft(state, button.dataset.craft);
+      setDisabled(button, !extra.inBase || !check.ok);
+    });
+    body.querySelectorAll("[data-show]").forEach(function (button) {
+      const id = button.dataset.show;
+      const stock = (state.goods && state.goods[id]) || 0;
+      const open = (state.display || []).some(function (slot) {
+        return !slot;
+      });
+      setDisabled(button, !extra.inBase || stock <= 0 || !open);
+    });
+    const craftNote = body.querySelector("[data-craft-note]");
+    if (craftNote) {
+      if (!state.buildings.workbench) craftNote.textContent = "作業台を建てると作れる";
+      else if (!extra.inBase) craftNote.textContent = "秘密基地に戻ると作れる・飾れる";
+      else craftNote.textContent = "飾ると、お客さんが歩いてきて買う";
+    }
     const hint = body.querySelector("[data-base-hint]");
     if (hint) {
       hint.textContent = extra.inBase
@@ -410,8 +468,24 @@
     if (note) note.textContent = message;
   }
 
+  function buildPocket() {
+    const pocket = $("pocket");
+    if (!pocket || pocket.childElementCount) return;
+    let html = '<p class="pocket-row"><span class="coin-icon" aria-hidden="true"></span><b id="pocket-coins">0</b><span class="sr">コイン</span></p>';
+    CFG().resourceOrder.forEach(function (id) {
+      const resource = CFG().resources[id];
+      html += '<p class="pocket-row">';
+      html += '<img alt="" src="assets/' + id + '.png" />';
+      html += '<b data-pocket="' + id + '">0</b>';
+      html += '<span class="sr">' + resource.name + "</span>";
+      html += "</p>";
+    });
+    pocket.innerHTML = html;
+  }
+
   function init(nextActions) {
     actions = nextActions;
+    buildPocket();
     const loaded = nextActions.loaded;
     const start = $("start-btn");
     if (loaded.locked) start.textContent = "見てみる";
@@ -439,6 +513,8 @@
       if (button.dataset.sell) actions.onSell(button.dataset.sell, false);
       else if (button.dataset.sellAll) actions.onSell(button.dataset.sellAll, true);
       else if (button.dataset.build) actions.onBuild(button.dataset.build);
+      else if (button.dataset.craft) actions.onCraft(button.dataset.craft);
+      else if (button.dataset.show) actions.onShow(button.dataset.show);
       else if (button.dataset.buy) actions.onBuy();
       else if (button.dataset.hire != null) actions.onHire();
       else if (button.dataset.save != null) actions.onSave();

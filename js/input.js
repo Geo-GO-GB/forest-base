@@ -102,7 +102,7 @@
 
   function isControl(target) {
     if (!target || !target.closest) return true;
-    return !!target.closest("button, a, input, textarea, select, label, #hud, #scrim, .panel, .side-buttons, #action-btn, #title-screen");
+    return !!target.closest("button, a, input, textarea, select, label, #hud, #pocket, #scrim, .panel, .side-buttons, #action-btn, #title-screen");
   }
 
   function bindStick(el, knob) {
