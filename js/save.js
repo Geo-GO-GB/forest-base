@@ -47,13 +47,14 @@
       carry: emptyBag(),
       storage: emptyBag(),
       backpack: false,
-      buildings: { box: false, workbench: false, desk: false },
+      buildings: { workbench: false, desk: false },
       helperHired: false,
       discoveredMushroom: false,
       nodes: defaultNodes(),
       progress: { helperMs: 0, workbenchMs: 0, customerMs: 0 },
       goods: root.Sim.emptyGoods(),
       display: root.Sim.emptyDisplay(),
+      crew: root.Sim.emptyCrew(),
       tutorialStep: 0,
       savedAt: 0,
     };
@@ -92,10 +93,30 @@
       state.display[i] = cfg().products[id] ? id : "";
     }
     state.backpack = raw.backpack === true;
-    state.buildings.box = !!(raw.buildings && raw.buildings.box);
     state.buildings.workbench = !!(raw.buildings && raw.buildings.workbench);
     state.buildings.desk = !!(raw.buildings && raw.buildings.desk);
-    state.helperHired = raw.helperHired === true;
+    if (raw.buildings && raw.buildings.box === true) {
+      /* 木箱は無くした。建てていた保存には、当時の代金（コイン4、枝3、小石2）を一度返す。 */
+      state.coins = clampInt(state.coins + 4, 0, BIG);
+      state.storage.twig = clampInt(state.storage.twig + 3, 0, BIG);
+      state.storage.pebble = clampInt(state.storage.pebble + 2, 0, BIG);
+    }
+    state.crew = root.Sim.emptyCrew();
+    const savedCrew = raw.crew || {};
+    const crewOrder = cfg().crewOrder;
+    for (let i = 0; i < crewOrder.length; i += 1) {
+      const id = crewOrder[i];
+      const src = savedCrew[id] || {};
+      state.crew[id] = {
+        hired: src.hired === true,
+        speed: clampInt(src.speed, 0, 6),
+        carry: clampInt(src.carry, 0, 6),
+        haste: clampInt(src.haste, 0, 6),
+        n: clampInt(src.n, 0, 4),
+      };
+    }
+    if (raw.helperHired === true) state.crew.twig.hired = true;
+    state.helperHired = state.crew.twig.hired;
     state.discoveredMushroom = raw.discoveredMushroom === true || state.buildings.desk;
     const savedNodes = raw.nodes || {};
     const list = cfg().nodes;

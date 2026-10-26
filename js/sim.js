@@ -19,10 +19,6 @@
     return state.backpack ? cfg().backpackCarry : cfg().baseCarry;
   }
 
-  function storageCap(state) {
-    return cfg().baseStorage + (state.buildings.box ? cfg().boxStorageBonus : 0);
-  }
-
   function haveTotal(state, id) {
     return (state.storage[id] || 0) + (state.carry[id] || 0);
   }
@@ -137,18 +133,115 @@
     return { ok: true };
   }
 
-  function canHire(state) {
-    if (state.helperHired) return { ok: false, reason: "owned" };
-    if (state.coins < cfg().helper.hireCost) return { ok: false, reason: "no-coins" };
+  function hire(state) {
+    return hireRole(state, "twig");
+  }
+
+  function emptyCrew() {
+    const crew = {};
+    const order = cfg().crewOrder;
+    for (let i = 0; i < order.length; i += 1) {
+      crew[order[i]] = { hired: false, speed: 0, carry: 0, haste: 0, n: 0 };
+    }
+    return crew;
+  }
+
+  function ensureCrew(state) {
+    if (!state.crew) state.crew = emptyCrew();
+    const order = cfg().crewOrder;
+    for (let i = 0; i < order.length; i += 1) {
+      const id = order[i];
+      const src = state.crew[id] || {};
+      state.crew[id] = {
+        hired: src.hired === true,
+        speed: src.speed || 0,
+        carry: src.carry || 0,
+        haste: src.haste || 0,
+        n: src.n || 0,
+      };
+    }
+    if (state.helperHired && !state.crew.twig.hired) state.crew.twig.hired = true;
+    state.helperHired = !!state.crew.twig.hired;
+    return state.crew;
+  }
+
+  function atLevel(list, level) {
+    const i = Math.max(0, Math.min(list.length - 1, level || 0));
+    return list[i];
+  }
+
+  function crewStats(state, id) {
+    ensureCrew(state);
+    const spec = cfg().crew[id];
+    const rec = state.crew[id];
+    return {
+      hired: !!rec.hired,
+      speed: atLevel(spec.speed, rec.speed),
+      carry: atLevel(spec.carry, rec.carry),
+      actMs: atLevel(spec.actMs, rec.haste),
+      n: rec.hired ? 1 + (rec.n || 0) : 0,
+    };
+  }
+
+  function canHireRole(state, id) {
+    ensureCrew(state);
+    const spec = cfg().crew[id];
+    if (!spec || !state.crew[id]) return { ok: false, reason: "missing" };
+    if (state.crew[id].hired) return { ok: false, reason: "owned" };
+    if (spec.needs === "workbench" && !state.buildings.workbench) return { ok: false, reason: "need-bench" };
+    if (state.coins < spec.hireCost) return { ok: false, reason: "no-coins" };
     return { ok: true };
   }
 
-  function hire(state) {
-    const check = canHire(state);
+  function canHire(state) {
+    return canHireRole(state, "twig");
+  }
+
+  function hireRole(state, id) {
+    const check = canHireRole(state, id);
     if (!check.ok) return check;
-    state.coins -= cfg().helper.hireCost;
-    state.helperHired = true;
-    return { ok: true };
+    state.coins -= cfg().crew[id].hireCost;
+    state.crew[id].hired = true;
+    if (id === "twig") state.helperHired = true;
+    return { ok: true, id: id };
+  }
+
+  function upgradeCost(state, id, track) {
+    ensureCrew(state);
+    const spec = cfg().crew[id];
+    const rec = state.crew[id];
+    if (!spec || !rec || !rec.hired) return 0;
+    const row = spec.upgrades[track];
+    if (!row) return 0;
+    const level = rec[track] || 0;
+    if (level >= row.costs.length) return 0;
+    return row.costs[level];
+  }
+
+  function canUpgrade(state, id, track) {
+    const cost = upgradeCost(state, id, track);
+    if (!(cost > 0)) return { ok: false, reason: "max" };
+    if (state.coins < cost) return { ok: false, reason: "no-coins" };
+    return { ok: true, cost: cost };
+  }
+
+  function upgradeRole(state, id, track) {
+    const check = canUpgrade(state, id, track);
+    if (!check.ok) return check;
+    state.coins -= check.cost;
+    state.crew[id][track] = (state.crew[id][track] || 0) + 1;
+    return { ok: true, id: id, track: track, level: state.crew[id][track] };
+  }
+
+  function grantStorage(state, id, amount) {
+    const resource = cfg().resources[id];
+    const n = Math.floor(Number(amount));
+    if (!resource || !(n > 0)) return 0;
+    const cap = 9007199254740991;
+    const before = state.storage[id] || 0;
+    const next = Math.min(cap, before + n);
+    state.storage[id] = next;
+    return next - before;
   }
 
   function runCycle(state, step, spec) {
@@ -172,19 +265,13 @@
   }
 
   function tickHelper(state, step) {
-    const helper = cfg().helper;
+    ensureCrew(state);
     if (!state.helperHired) return { status: "off", produced: 0 };
-    return runCycle(state, step, {
-      intervalMs: helper.intervalMs,
-      progressKey: "helperMs",
-      outputAmount: helper.amount,
-      blocked: function () {
-        return "";
-      },
-      apply: function () {
-        state.storage[helper.resource] += helper.amount;
-      },
-    });
+    /* 枝は届けた瞬間に増える。ここでは時間だけを抑え、巨大な delta では進ませない。 */
+    if (!state.progress) state.progress = {};
+    const stepMs = clampStep(step);
+    state.progress.helperMs = Math.min(cfg().maxFrameMs, (state.progress.helperMs || 0) + stepMs);
+    return { status: "run", produced: 0 };
   }
 
   function tickWorkbench(state, step) {
@@ -329,7 +416,6 @@
   root.Sim = {
     bagCount: bagCount,
     carryCap: carryCap,
-    storageCap: storageCap,
     haveTotal: haveTotal,
     collect: collect,
     deposit: deposit,
@@ -340,6 +426,15 @@
     buyBackpack: buyBackpack,
     canHire: canHire,
     hire: hire,
+    emptyCrew: emptyCrew,
+    ensureCrew: ensureCrew,
+    crewStats: crewStats,
+    canHireRole: canHireRole,
+    hireRole: hireRole,
+    upgradeCost: upgradeCost,
+    canUpgrade: canUpgrade,
+    upgradeRole: upgradeRole,
+    grantStorage: grantStorage,
     tickProduction: tickProduction,
     tickRespawn: tickRespawn,
     canCraft: canCraft,

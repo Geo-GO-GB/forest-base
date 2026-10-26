@@ -26,11 +26,13 @@ function memoryStorage() {
 load("js/config.js");
 load("js/format.js");
 load("js/layout.js");
+load("js/nav.js");
 load("js/sim.js");
 load("js/save.js");
 load("js/sprites.js");
 
 const CFG = globalThis.GAME_CONFIG;
+const Nav = globalThis.Nav;
 const Sim = globalThis.Sim;
 const Format = globalThis.Format;
 const Save = globalThis.Save;
@@ -140,7 +142,8 @@ test("deposit, sell, backpack, build, and hire", function () {
   assert.equal(Sim.buyBackpack(state).ok, true);
   assert.equal(state.backpack, true);
   assert.equal(Sim.buyBackpack(state).reason, "owned");
-  assert.equal(Sim.build(state, "box").ok, true);
+  assert.equal(Sim.build(state, "workbench").ok, true);
+  assert.equal(state.buildings.workbench, true);
   assert.equal(Sim.build(state, "desk").reason, "locked");
   state.discoveredMushroom = true;
   state.carry.mushroom = 1;
@@ -169,9 +172,10 @@ test("helper keeps gathering without a storage cap", function () {
   const state = fresh();
   state.helperHired = true;
   state.storage.twig = 100;
-  const frames = Math.ceil(CFG.helper.intervalMs / 16);
-  for (let i = 0; i < frames; i += 1) Sim.tickProduction(state, 16);
-  assert.equal(state.storage.twig, 100 + CFG.helper.amount);
+  assert.equal(Sim.grantStorage(state, "twig", 3), 3);
+  assert.equal(state.storage.twig, 103);
+  Sim.tickProduction(state, 16 * 40);
+  assert.equal(state.storage.twig, 103);
 });
 
 test("a huge delta does not grant offline production", function () {
@@ -192,10 +196,10 @@ test("a huge delta does not grant offline production", function () {
 test("zero delta does not finish a craft", function () {
   const state = fresh();
   state.helperHired = true;
-  state.progress.helperMs = CFG.helper.intervalMs - 1;
+  state.progress.helperMs = 40;
   Sim.tickProduction(state, 0);
   assert.equal(state.storage.twig, 0);
-  assert.equal(state.progress.helperMs, CFG.helper.intervalMs - 1);
+  assert.equal(state.progress.helperMs, 40);
 });
 
 test("counts use short suffixes and drop a trailing zero", function () {
@@ -258,7 +262,10 @@ test("save roundtrip keeps progress and ignores an old timestamp", function () {
   state.goods.tombo = 2;
   state.display[0] = "ame";
   state.progress.customerMs = 40;
-  state.progress.helperMs = CFG.helper.intervalMs - 10;
+  state.progress.helperMs = 40;
+  state.crew.twig.speed = 1;
+  state.crew.twig.n = 1;
+  state.crew.pebble.hired = true;
   state.nodes["twig-1"].depleted = true;
   state.nodes["twig-1"].respawnMs = 1234;
   state.savedAt = Date.now() - 48 * 60 * 60 * 1000;
@@ -273,11 +280,43 @@ test("save roundtrip keeps progress and ignores an old timestamp", function () {
   assert.equal(loaded.state.goods.tombo, 2);
   assert.equal(loaded.state.display[0], "ame");
   assert.equal(loaded.state.progress.customerMs, 40);
-  assert.equal(loaded.state.progress.helperMs, CFG.helper.intervalMs - 10);
+  assert.equal(loaded.state.progress.helperMs, 40);
+  assert.equal(loaded.state.crew.twig.hired, true);
+  assert.equal(loaded.state.crew.twig.speed, 1);
+  assert.equal(loaded.state.crew.twig.n, 1);
+  assert.equal(loaded.state.crew.pebble.hired, true);
   assert.equal(loaded.state.nodes["twig-1"].depleted, true);
   assert.equal(loaded.state.nodes["twig-1"].respawnMs, 1234);
   assert.equal(loaded.state.helperHired, true);
   assert.notEqual(loaded.state.savedAt, 0);
+});
+
+test("an old wooden box save refunds its cost and still loads", function () {
+  const ls = memoryStorage();
+  globalThis.localStorage = ls;
+  ls.setItem(CFG.saveKey, JSON.stringify({
+    version: 1,
+    coins: 3,
+    buildings: { box: true, workbench: true, desk: false },
+    storage: { twig: 1, pebble: 4 },
+    helperHired: true,
+  }));
+  const loaded = Save.load();
+  assert.equal(loaded.warning, "");
+  assert.equal(loaded.locked, false);
+  assert.equal(loaded.state.coins, 7);
+  assert.equal(loaded.state.storage.twig, 4);
+  assert.equal(loaded.state.storage.pebble, 6);
+  assert.equal(loaded.state.buildings.box, undefined);
+  assert.equal(loaded.state.buildings.workbench, true);
+  assert.equal(loaded.state.buildings.desk, false);
+  assert.equal(loaded.state.helperHired, true);
+  assert.equal(Sim.build(loaded.state, "box").reason, "missing");
+  assert.equal(Save.save(loaded.state).ok, true);
+  const again = Save.load();
+  assert.equal(again.state.coins, 7);
+  assert.equal(again.state.storage.twig, 4);
+  assert.equal(again.state.storage.pebble, 6);
 });
 
 test("corrupt saves are quarantined and a newer version is not overwritten", function () {
@@ -302,7 +341,7 @@ test("corrupt saves are quarantined and a newer version is not overwritten", fun
 test("sprite list is one entry per placeholder the game can swap", function () {
   const list = globalThis.SPRITE_LIST;
   const by = globalThis.SPRITE_BY_KEY;
-  assert.equal(list.length, 19);
+  assert.equal(list.length, 30);
   const seen = {};
   list.forEach(function (sprite) {
     assert.ok(!seen[sprite.key], "duplicate " + sprite.key);
@@ -316,10 +355,18 @@ test("sprite list is one entry per placeholder the game can swap", function () {
   });
   const game = fs.readFileSync(path.join(__dirname, "../js/game.js"), "utf8");
   const ui = fs.readFileSync(path.join(__dirname, "../js/ui.js"), "utf8");
-  ["player", "backpack", "helper", "twig", "pebble", "berry", "mushroom", "box", "workbench", "desk", "shop", "marker", "tree", "tree-dark", "flower", "flower-pink", "flower-white", "stone"].forEach(function (key) {
+  ["player", "backpack", "helper", "twig", "pebble", "berry", "mushroom", "workbench", "desk", "shop", "marker", "tree", "tree-dark", "flower", "flower-pink", "flower-white", "stone"].forEach(function (key) {
     assert.ok(game.includes('"' + key + '"'), key);
   });
   assert.equal(seen.plank, true);
+  ["pebble-actor", "berry-actor", "craft", "clerk", "customer", "tombo", "ame", "koma", "lamp", "coin", "saw", "stand"].forEach(function (key) {
+    assert.equal(seen[key], true, key);
+  });
+  assert.ok(!game.includes("setTint"), "crew and visitors use their own sprites");
+  assert.ok(game.includes('"customer"'));
+  assert.ok(game.includes('"stand"'));
+  assert.ok(game.includes('"saw"'));
+  assert.ok(game.includes('"coin"'));
   assert.ok(CFG.resourceOrder.indexOf("plank") >= 0);
   assert.ok(ui.includes("assets/"));
   assert.ok(game.includes('scene.load.image(sprite.key, "assets/" + sprite.file)'));
@@ -383,6 +430,57 @@ test("the game loop does not fast-forward from savedAt", function () {
   assert.ok(drawPage.includes("user-scalable=no"));
   assert.ok(game.includes("resolution: 1"));
   assert.ok(!game.includes("lookAhead"));
+});
+
+test("routes bend around a solid obstacle", function () {
+  const world = { width: 400, height: 400, pad: 8 };
+  const colliders = [{ t: "ellipse", x: 200, y: 200, rx: 50, ry: 36 }];
+  const path = Nav.route({ x: 200, y: 80 }, { x: 200, y: 320 }, colliders, world, 11);
+  assert.ok(path.length >= 2);
+  let crossed = false;
+  for (let i = 0; i < path.length - 1; i += 1) {
+    const a = path[i];
+    const b = path[i + 1];
+    const steps = 8;
+    for (let s = 0; s <= steps; s += 1) {
+      const t = s / steps;
+      const x = a.x + (b.x - a.x) * t;
+      const y = a.y + (b.y - a.y) * t;
+      if (Nav.hits(x, y, 11, colliders)) crossed = true;
+    }
+  }
+  assert.equal(crossed, false);
+});
+
+test("crew upgrades scale and old helper saves hire the uncle", function () {
+  const state = fresh();
+  state.coins = 100;
+  assert.equal(Sim.hireRole(state, "craft").reason, "need-bench");
+  assert.equal(Sim.hire(state).ok, true);
+  assert.equal(state.helperHired, true);
+  assert.equal(state.crew.twig.hired, true);
+  assert.equal(Sim.crewStats(state, "twig").n, 1);
+  assert.equal(Sim.crewStats(state, "twig").carry, 3);
+  const first = Sim.upgradeCost(state, "twig", "n");
+  assert.equal(Sim.upgradeRole(state, "twig", "n").ok, true);
+  assert.equal(Sim.crewStats(state, "twig").n, 2);
+  const second = Sim.upgradeCost(state, "twig", "n");
+  assert.ok(second > first);
+  assert.equal(Sim.upgradeRole(state, "twig", "speed").ok, true);
+  assert.ok(Sim.crewStats(state, "twig").speed > 100);
+  state.buildings.workbench = true;
+  state.storage.twig = 4;
+  state.storage.plank = 2;
+  assert.equal(Sim.hireRole(state, "craft").ok, true);
+  assert.equal(Sim.hireRole(state, "clerk").ok, true);
+  const ls = memoryStorage();
+  globalThis.localStorage = ls;
+  ls.setItem(CFG.saveKey, JSON.stringify({ version: 1, helperHired: true, coins: 3 }));
+  const old = Save.load();
+  assert.equal(old.state.helperHired, true);
+  assert.equal(old.state.crew.twig.hired, true);
+  assert.equal(old.state.crew.pebble.hired, false);
+  assert.equal(old.state.coins, 3);
 });
 
 if (failed) {
